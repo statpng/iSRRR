@@ -1,7 +1,7 @@
 Package: iSRRR
 Type: Package
 Title: Integrative sparse reduced-rank regression via orthogonal rotation for analysis of high-dimensional multi-source data
-Version: 0.1
+Version: 0.3
 Date: 2022-05-23
 Author: Kipoong Kim and Sungkyu Jung
 Maintainer: Kipoong Kim <statpng@snu.ac.kr>
@@ -9,7 +9,7 @@ Description: Integrative sparse reduced-rank regression (iSRRR) model to identif
 License: GPL-3
 Imports: Rcpp (>= 1.0.8.3), ggplot2, MASS, dplyr, mnormt, plyr, GPArotation, gglasso, gtools, rrr, plot.matrix
 LinkingTo: Rcpp, RcppArmadillo
-RoxygenNote: 7.2.1
+RoxygenNote: 7.2.3
 Encoding: UTF-8
 NeedsCompilation: yes
 Packaged: 2022-07-13 01:13:18 UTC; png

@@ -335,6 +335,82 @@ png.varimax <- function(X){
 
 
 
+UpdateA.ManifoldOptim <- function(X, Y, A=NULL, B, tau, eps=1e-10, Max_Iteration=100){
+  # X <- data$X; Y <- data$Y; B <- data$B
+  # eps=1e-10; Max_Iteration=100
+  # tau=5
+  
+  n <- nrow(X); p <- ncol(X); q <- ncol(Y); r <- ncol(B)
+  
+  
+  # tA <- function(A) { A = matrix(A, q, r); A[apply(A,1,norm,"2")<sqrt(eps),] <- 0; with(svd(A), tcrossprod(u,v)) }
+  tA <- function(A) { A = matrix(A, q, r) }
+  f <- function(A) { A <- tA(A); mean( (Y - X %*% B %*% t(A))^2 ) +
+    tau * sum( apply(A, 1, function(xx) { sqrt( sum(xx^2) + eps ) - eps }) )
+  }
+  dF <- function(A) { A <- tA(A); As <- t( apply(A, 1, function(a) rep( 1/sqrt( sum(a^2) + eps), length(a) ) ) ); - 1/(n*q) * 2 * t(Y - X %*% B %*% t(A)) %*% (X %*% B) + tau * A * As }
+  
+  # f <- function(A) { A <- tA(A); mean( (Y - X %*% B %*% t(A))^2 ) + 
+  #   tau * sum( sqrt( sum(A^2) + eps ) - eps )
+  # }
+  # dF <- function(A) { A <- tA(A); As <- 1/sqrt( sum(A^2) + eps); - 1/(n*q) * 2 * t(Y - X %*% B %*% t(A)) %*% (X %*% B) + tau * A * As }
+  
+  
+  library(ManifoldOptim)
+  mod <- Module("ManifoldOptim_module", PACKAGE = "ManifoldOptim")
+  prob <- new(mod$RProblem, f, dF)
+  
+  if( !is.null(A) ){
+    A0 <- as.numeric( A )
+  } else {
+    A0 <- as.numeric( GPArotation::quartimax( with( svd(t(Y) %*% X %*% B), tcrossprod(u,v) ) )$loadings )
+  }
+  
+  # A0 <- as.numeric(GPArotation::quartimax(orthonorm(matrix(rnorm(q*r), nrow=q, ncol=r)))$loadings)
+  # A0 <- as.numeric(orthonorm(matrix(rnorm(q*r), nrow=q, ncol=r)))
+  mani.params <- get.manifold.params(IsCheckParams = FALSE)
+  solver.params <- get.solver.params(IsCheckParams = FALSE,
+                                     isconvex = FALSE, 
+                                     Tolerance = 1e-4,
+                                     Max_Iteration = Max_Iteration)
+  mani.defn <- get.stiefel.defn(q, r)
+  
+  res <- manifold.optim(prob, mani.defn, method = c("RTRSD", "LRTRSR1")[2],
+                        mani.params = mani.params, 
+                        solver.params = solver.params, 
+                        x0 = A0)
+  
+  
+  
+  # out.tmp <- NULL
+  # for( i in 1:50 ){
+  #   methods <- c("LRBFGS","LRTRSR1","RBFGS","RBroydenFamily","RCG","RNewton","RSD","RTRNewton","RTRSD","RTRSR1","RWRBFGS")[-c(6,8)]
+  #   ff <- lapply(methods, function(mm){
+  #     res <- manifold.optim(prob, mani.defn, method = mm,
+  #                           mani.params = mani.params, 
+  #                           solver.params = solver.params, 
+  #                           x0 = A0)
+  #     res
+  #   })
+  #   
+  #   tmp <- sapply(ff, function(res) c(angle=png.angle(data$A, tA(res$xopt))$max * 180/pi, time=res$elapsed) )
+  #   colnames(tmp) <- methods
+  #   out.tmp[[i]] <- tmp
+  #   print( round(Reduce("+", out.tmp) / i, 3) )
+  # }
+  # LRBFGS LRTRSR1  RBFGS RBroydenFamily    RCG    RSD  RTRSD RTRSR1 RWRBFGS
+  # angle 19.505  18.084 19.599         19.807 18.056 17.021 10.207 18.107  21.220
+  # time   0.109   0.104  0.113          0.110  0.221  0.111  0.101  0.106   0.112
+  # LRTRSR1; RTRSD
+  
+  
+  Anew <- tA(res$xopt)
+  # Anew <- ifelse(abs(Anew)<eps, 0, Anew)
+  # Anew <- with(svd(Anew), tcrossprod(u,v))
+  
+  list(res=res, A=Anew)
+}
+
 
 
 

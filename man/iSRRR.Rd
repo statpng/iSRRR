@@ -9,11 +9,12 @@ iSRRR(
   Y,
   pvec,
   nrank,
-  cutoff,
+  nu,
   params = NULL,
   control = NULL,
+  trueA = NULL,
   trueB = NULL,
-  use.gglasso = TRUE
+  methodA = "hard"
 )
 }
 \arguments{
@@ -25,13 +26,13 @@ iSRRR(
 
 \item{nrank}{The rank of matrices to be estimated.}
 
-\item{cutoff}{Hard-thresholding parameter. Default is 0 (no thresholding).}
-
 \item{params}{A list with \code{lambda.seq}=NULL, \code{nlambda}=5, \code{lambda.factor}=1e-4, \code{log.scale}=TRUE, and \code{group.size}=FALSE.}
 
-\item{control}{A list with \code{best}=FALSE, \code{early.stop}=TRUE, \code{rot.method}="quartimax" \code{maxit.B}=3e8, \code{eps.B}=1e-8, \code{maxit.mse}=50, \code{eps.mse}=1e-6, \code{X.scale}=c("group", "each"), \code{Y.scale}=FALSE, \code{verbose}=FALSE, and \code{threads}=1.}
+\item{control}{A list with \code{best}=FALSE, \code{rot.method}="quartimax" \code{maxit.B}=3e8, \code{eps.B}=1e-8, \code{maxit.mse}=50, \code{eps.mse}=1e-6, \code{X.scale}=c("group", "each"), \code{Y.scale}=FALSE, \code{verbose}=FALSE, and \code{threads}=1.}
 
 \item{trueB}{A list contains X with dimension \code{n} by \code{p} and Y with dimension \code{n} by \code{q}.}
+
+\item{cutoff}{Hard-thresholding parameter. Default is 0 (no thresholding).}
 
 \item{use.gglasso}{Default is TRUE.}
 }
@@ -42,6 +43,20 @@ A list with output objects
 The iSRRR solves the constrained optimization problem with sparse regularization:
 
 \eqn{ \frac{1}{2n} \| Y - X B A^T \|_F^2 +  \lambda \sum \sum \| b_{ik} \|_2}  subject to \eqn{A \in \mathcal{T}(v), ~ A \in \mathcal{O}_s(q,r) }
+}
+\examples{
+
+if(FALSE){
+
+fit <- iSRRR( X = data$X, Y = data$Y, pvec = data$pvec,
+nrank = data$nrank,
+nu = c(0:4*0.1),
+params=list(nlambda=10, lambda.factor=1e-4),
+control=list(best=TRUE, maxit.mse=20, eps.mse=1e-8,
+maxit.B=6e6, eps.B=1e-6),
+trueA = data$A, trueB = data$B )
+}
+
 }
 \references{
 No reference.

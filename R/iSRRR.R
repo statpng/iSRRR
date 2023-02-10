@@ -15,7 +15,7 @@
 #'
 #' @param params A list with \code{lambda.seq}=NULL, \code{nlambda}=5, \code{lambda.factor}=1e-4, \code{log.scale}=TRUE, and \code{group.size}=FALSE.
 #'
-#' @param control A list with \code{best}=FALSE, \code{early.stop}=TRUE, \code{rot.method}="quartimax" \code{maxit.B}=3e8, \code{eps.B}=1e-8, \code{maxit.mse}=50, \code{eps.mse}=1e-6, \code{X.scale}=c("group", "each"), \code{Y.scale}=FALSE, \code{verbose}=FALSE, and \code{threads}=1.
+#' @param control A list with \code{best}=FALSE, \code{rot.method}="quartimax" \code{maxit.B}=3e8, \code{eps.B}=1e-8, \code{maxit.mse}=50, \code{eps.mse}=1e-6, \code{X.scale}=c("group", "each"), \code{Y.scale}=FALSE, \code{verbose}=FALSE, and \code{threads}=1.
 #' @param trueB A list contains X with dimension \code{n} by \code{p} and Y with dimension \code{n} by \code{q}.
 #' 
 #' @param use.gglasso Default is TRUE.
@@ -30,7 +30,18 @@
 #' No reference.
 #'
 ### #' @keywords "Data integration" "Multi-source data" "Orthogonal rotation" "Reduced-rank regression" "Structural learning"
-#'
+#' @examples 
+#' 
+#' if(FALSE){
+#' 
+#' fit <- iSRRR( X = data$X, Y = data$Y, pvec = data$pvec,
+#' nrank = data$nrank,
+#' nu = c(0:4*0.1),
+#' params=list(nlambda=10, lambda.factor=1e-4),
+#' control=list(best=TRUE, maxit.mse=20, eps.mse=1e-8,
+             #' maxit.B=6e6, eps.B=1e-6),
+#' trueA = data$A, trueB = data$B )
+#' }
 #'
 #' @importFrom gglasso gglasso
 #' @import Rcpp
@@ -38,65 +49,64 @@
 #' @useDynLib iSRRR
 #'
 #' @export arcov
+#' 
 #' @export iSRRR
-iSRRR <- function(X, Y, pvec, nrank, cutoff, params=NULL, control=NULL, trueB=NULL, use.gglasso=TRUE){
-
+iSRRR <- function(X, Y, pvec, nrank, nu, params=NULL, control=NULL, trueA=NULL, trueB=NULL, methodA="hard"){
 
   if(FALSE){
-
-    library(iSRRR)
-    set.seed(1)
-    n=50; d=4; q=50; p=50; r=6; es="1"; snr=0.5
-
-    params <- list(nlambda=5, lambda.factor=1e-4, group.size=FALSE)
-    control <- list(best=TRUE, maxit.mse=20, eps.mse=1e-4, maxit.B=1e4, eps.B=1e-4)
-
-    data <- simdata.sgl(typeA="sparse0.0", typeB="individual", n=n, d=d, q=q, pvec=c(10,10,100,200), rvec=rep(1,r), es=es, simplify=TRUE, snr=snr, rho_X = 0.5, param.sgl=c(1.0, 1.0, 0.5, 0.2))
-    
-    
-    data <- simdata2(typeA="sparse0.0", typeB="row", n=n, d=d, d0=3, q=q, pvec=rep(p,d), rvec=rep(1,r), es=es, simplify=TRUE, snr=snr, rho_X = 0.5)
-    
-    
-    
-    fit1 <- iSRRR( X = data$X, Y = data$Y, pvec = data$pvec, nrank = 6,
-                  cutoff = 0.4,
-                  params=list(nlambda=20, lambda.factor=1e-4, group.size=TRUE),
-                  control=list(best=TRUE, maxit.mse=20, eps.mse=1e-4, maxit.B = 1e4, eps.B = 1e-4), trueB = data$B, use.gglasso=TRUE )
-
-    
-    
-    fit2 <- iSRRR( X = data$X, Y = data$Y, pvec = data$pvec, nrank = 6,
-                  cutoff = 0.4,
-                  params=list(nlambda=20, lambda.factor=1e-5, group.size=FALSE),
-                  control=list(best=TRUE, maxit.mse=20, eps.mse=1e-4, maxit.B = 1e4, eps.B = 1e-4), trueB = data$B, use.gglasso=TRUE )
-    
-    
-    fit1 %>% png.IC()
-    fit2 %>% png.IC()
-    
-    fit1$B[[7]] %>% print.B2()
-    fit2$B[[7]] %>% print.B2()
-    
-    #
-    
-    fit1 %>% { .$B[[which.min(png.IC(.)[,"BIC"])]] } |> print.B()
-    fit2 %>% { .$B[[which.min(png.IC(.)[,"BIC"])]] } |> print.B()
-    
-    #
-    
-    
-
-    X=data$X; Y=data$Y; pvec=data$pvec;
-    nrank=r;
-    cutoff=0.2;
-    params=params;
-    control=control; trueB=data$B
-    use.gglasso=TRUE
-
+    fit <- iSRRR( X = data$X, Y = data$Y, pvec = data$pvec,
+                  nrank = data$nrank,
+                  nu = c(0:4*0.1),
+                  methodA="hard",
+                  params=list(nlambda=10, lambda.factor=1e-5),
+                  control=list(best=TRUE, maxit.mse=200, eps.mse=1e-12,
+                  maxit.B=3e6, eps.B=1e-8),
+                  trueA = data$A, trueB = data$B )
   }
   
-
-
+  
+  if(FALSE){
+    X = data$X; Y = data$Y; pvec = data$pvec;
+    nrank = data$nrank;
+    nu = (0:4*0.1);
+    params=list(nlambda=10, lambda.factor=1e-4);
+    control=list(best=TRUE, maxit.mse=100, eps.mse=1e-12, 
+                 maxit.B=3e6, eps.B=1e-6);
+    trueA = data$A; trueB = data$B
+    methodA <- "hard"
+    
+    X = X
+    Y = Y
+    pvec = pvec
+    nrank = 2
+    nu = c(0:4*0.1)[4]
+    methodA="hard"
+    params=list(nlambda=10, lambda.factor=1e-4)
+    control=list(best=TRUE, maxit.mse=200, eps.mse=1e-10,
+                 maxit.B=1e4, eps.B=1e-4)
+    trueA=NULL
+    trueB=NULL
+    
+    
+    
+    X = data$X
+    Y = data$Y
+    pvec = data$pvec
+    nrank = data$nrank
+    nu = c(0,0.1,0.2)[1]
+    params=list(nlambda=20, lambda.factor=1e-4)
+    control=list(best=TRUE, maxit.mse=200, eps.mse=1e-10, 
+                 maxit.B = 3e8, eps.B = 1e-10) 
+    trueA=data$A
+    trueB=data$B
+  }
+  
+  
+  
+  if( length(pvec) != ncol(X) ) stop("pvec == ncol(X)")
+  
+  
+  
   fit.default <- default.params()
   params0 <- fit.default$params
   control0 <- fit.default$control
@@ -116,7 +126,6 @@ iSRRR <- function(X, Y, pvec, nrank, cutoff, params=NULL, control=NULL, trueB=NU
     group.size <- params$group.size
 
     best <- control$best
-    early.stop <- control$early.stop
     rot.method <- control$rot.method
     maxit.B <- control$maxit.B
     eps.B <- control$eps.B
@@ -124,6 +133,7 @@ iSRRR <- function(X, Y, pvec, nrank, cutoff, params=NULL, control=NULL, trueB=NU
     eps.mse <- control$eps.mse
     X.scale <- control$X.scale
     Y.scale <- control$Y.scale
+    use.gglasso <- control$use.gglasso
     verbose <- control$verbose
     threads <- control$threads
 
@@ -135,9 +145,8 @@ iSRRR <- function(X, Y, pvec, nrank, cutoff, params=NULL, control=NULL, trueB=NU
   d <- max(pvec);  q <- ncol(Y)
 
 
-
-  fit.init <- get.init(X=X, Y=Y, pvec=pvec, nrank=nrank, lambda.seq=lambda.seq,
-                       lambda.factor=lambda.factor, nlambda=nlambda, log.scale=log.scale, group.size=group.size)
+  
+  fit.init <- get.init(X=X, Y=Y, pvec=pvec, nrank=nrank, lambda.seq=lambda.seq, lambda.factor=lambda.factor, nlambda=nlambda, log.scale=log.scale, group.size=group.size)
 
 
   A0 <- fit.init$A0
@@ -146,43 +155,56 @@ iSRRR <- function(X, Y, pvec, nrank, cutoff, params=NULL, control=NULL, trueB=NU
   params$lambda.seq <- fit.init$lambda.seq
   params$nlambda <- fit.init$nlambda
 
-
-  start <- proc.time()
-  out <- fit.iSRRR(
-    X = X,
-    Y = Y,
-    A0 = A0,
-    B0 = B0,
-    pvec = pvec,
-    nrank = nrank,
-    cutoff = cutoff,
-    params = params,
-    control = control,
-    trueB = trueB, use.gglasso=use.gglasso
-  )
-  end <- proc.time()
-
-
-  SSE.list <- lapply( out, function(x) mean( (Y-X%*%x$C)^2 ) )
-  attr(SSE.list, "npqdr") <- c(n=nrow(X), p=ncol(X), q=ncol(Y), d=max(pvec), r=nrank)
-
-
-  list(
-    # X = X, Y = Y,
-    pvec=pvec, nrank=nrank,
-    A = lapply( out, function(x) x$A ),
-    B = lapply( out, function(x) x$B ),
-    # C = lapply( out, function(x) x$C ),
-    SSE = SSE.list,
-    diff.mse = lapply( out, function(x) x$diff ),
-    # diff.B = lapply( out, function(x) x$diff.B ),
-    simplexity = lapply( out, function(x) x$simplexity ),
-    # iter.B = lapply( out, function(x) x$it.B ),
-    iter.mse = lapply( out, function(x) x$it.mse ),
-    cutoff = cutoff,
-    params = params,
-    control = control,
-    trueB = trueB, time = end-start )
+  out.final <- NULL
+  for( inu in 1:length(nu) ){
+    
+    nu_i <- nu[inu]
+    
+    start <- proc.time()
+    out <- fit.iSRRR(
+      X = X,
+      Y = Y,
+      A0 = A0,
+      B0 = B0,
+      pvec = pvec,
+      nrank = nrank,
+      nu = nu_i,
+      methodA = methodA,
+      params = params,
+      control = control,
+      trueB = trueB, 
+      use.gglasso=use.gglasso
+    )
+    end <- proc.time()
+    
+    print(paste0(inu, " / ", length(nu), ":"))
+    print(end-start)
+    
+    
+    SSE.list <- lapply( out, function(x) mean( (Y-X%*%x$C)^2 ) )
+    attr(SSE.list, "npqdr") <- c(n=nrow(X), p=ncol(X), q=ncol(Y), d=max(pvec), r=nrank)
+    
+    
+    out.final[[inu]] <- list(
+      # X = X, Y = Y,
+      pvec=pvec, nrank=nrank,
+      A = lapply( out, function(x) x$A ),
+      B = lapply( out, function(x) x$B ),
+      SSE = SSE.list,
+      mse.path = lapply( out, function(x) x$mse.path ),
+      diff.mse = lapply( out, function(x) x$diff ),
+      simplexity = lapply( out, function(x) x$simplexity ),
+      iter.mse = lapply( out, function(x) x$it.mse ),
+      nu = nu_i,
+      params = params,
+      control = control,
+      trueA = trueA, trueB = trueB, 
+      time.lambda = lapply( out, function(x) x$time.lambda ),
+      time = end-start )
+    
+  }
+    
+  out.final
 
 }
 
@@ -231,22 +253,22 @@ default.params <- function(){
 
   params0 <- list(
     lambda.seq=NULL,
-    nlambda=5,
-    lambda.factor=1e-4, # 0.0001
+    nlambda=10,
+    lambda.factor=1e-3, # 0.0001
     log.scale=TRUE,
-    group.size=FALSE
+    group.size=TRUE
   )
 
   control0 = list(
     best = FALSE,
-    early.stop = TRUE,
     rot.method = "quartimax", # c("varimax", "quartimax", "oblimin", "oblimax", "infomax", "CF", "McCammon", "simplimax", "tandem", "entropy"),
-    maxit.B = 3e8,
-    eps.B = 1e-8,
-    maxit.mse = 50,
+    maxit.B = 1e6,
+    eps.B = 1e-6,
+    maxit.mse = 20,
     eps.mse = 1e-6,
     X.scale = FALSE, # c("group", "each"),
     Y.scale = FALSE, # TRUE, FALSE
+    use.gglasso=TRUE,
     verbose=FALSE,
     threads=1
   )
@@ -260,12 +282,12 @@ default.params <- function(){
 
 
 
-fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,cutoff,params,control,trueB=NULL, use.gglasso=TRUE){
+fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL, use.gglasso=TRUE){
 
 
   n <- nrow(Y);  p <- length(pvec);
   d <- max(pvec);  q <- ncol(Y)
-
+  r <- nrank
 
   {
 
@@ -277,7 +299,6 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,cutoff,params,control,trueB=NULL, use
 
 
     best <- control$best
-    early.stop <- control$early.stop
     rot.method <- control$rot.method
     maxit.B <- control$maxit.B
     eps.B <- control$eps.B
@@ -299,331 +320,219 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,cutoff,params,control,trueB=NULL, use
 
 
 
-  # gglasso -----------------------------------------------------------------
-  if(use.gglasso){
-
-    out <- NULL
-    for( ll in 1:nlambda ){
-
-      lambda <- lambda.seq[ll]
-      # if(group.size){
-      #   lambda <- lambda * sqrt(pik)[,1]
-      # }
-
-      it.mse <- 1
-
-      diff <- matrix(NA, nrow=maxit.mse, ncol=4)
-      colnames(diff) <- c("Y", "A", "B", "C")
-      diff[1,] <- eps.mse*2
-
-      simplexity <- matrix(NA, nrow=maxit.mse, ncol=2)
-      colnames(simplexity) <- c("quartimax", "varimax")
-
-      minimum <- 9e+5
-      min.count <- 0
-      while((it.mse < maxit.mse)&( diff[it.mse,"C"] > eps.mse)){
-
-        it.mse = it.mse+1
-
-        if(it.mse == 2){
-          A <- A0
-          B <- B0
+  # iSRRR -----------------------------------------------------------------
+  
+  out <- NULL
+  for( ll in 1:nlambda ){
+    
+    start <- proc.time()
+    
+    lambda <- lambda.seq[ll]
+    # if(group.size){
+    #   lambda <- lambda * sqrt(pik)[,1]
+    # }
+    
+    it.mse <- 1
+    
+    mse.path <- matrix(NA, nrow=maxit.mse+1, ncol=2)
+    colnames(mse.path) <- c("mse", "mse+B")
+    diff <- matrix(NA, nrow=maxit.mse+1, ncol=4)
+    colnames(diff) <- c("Y", "A", "B", "C")
+    diff[1,] <- eps.mse*2
+    
+    simplexity <- matrix(NA, nrow=maxit.mse+1, ncol=2)
+    colnames(simplexity) <- c("quartimax", "varimax")
+    
+    minimum <- 9e+5
+    min.count <- 0
+    while((it.mse < maxit.mse+1)&( diff[it.mse,"C"] > eps.mse)){
+      # print(it.mse)
+      it.mse = it.mse+1
+      
+      if(it.mse == 2){
+        A <- A0
+        B <- B0
+      }
+      
+      
+      # Old A, B ----------------------------------------------------------------
+      {
+        Aold <- A
+        Bold <- B
+      }
+      
+      
+      
+      
+      if(methodA == "hard"){
+        
+        A <- with( png.svd( crossprod(Y, X) %*% B ), tcrossprod( u, v ) )
+        # A <- ifelse( abs(A) > cutoff, A, 0 )
+        A <- t( apply(A, 1, function(a){
+          if( all( norm(a, "2") < nu ) ){
+            rep(0, length(a))
+          } else {
+            a
+          }
+        }) )
+        A <- with( png.svd(A), tcrossprod(u,v) )
+        
+      } else if(methodA == "RSD"){
+        
+        if( all( B == 0 ) ){
+          A <- rbind( diag(r), matrix(0, q-r, r))
+        } else {
+          A <- UpdateA.ManifoldOptim(X, Y, A, B, nu, Max_Iteration = 50)$A
         }
-
-
-        # Old A, B ----------------------------------------------------------------
-        {
-          Aold <- A
-          Bold <- B
-        }
-
-
-        {
-          Q <- Update.Rotation(A, rot.method = rot.method)$rotation
-
-          A <- A %*% Q
-          B <- B %*% Q
-        }
-
-
-        {
-          A <- with( png.svd( crossprod(Y, X) %*% B ), tcrossprod( u, v ) )
-          A <- ifelse( abs(A) > cutoff, A, 0 )
-          A <- with(png.svd(A), tcrossprod(u,v))
-        }
-
-        {
-          fit.gglasso <- NULL
-          for(k in 1:nrank){
-
+        
+      }
+      
+      
+      Q <- Update.Rotation(A, rot.method = rot.method)$rotation
+      
+      A <- A %*% Q
+      B <- B %*% Q
+      
+      
+      
+      
+      if(verbose) print( paste0("(1) ", mean( (tcrossprod(B,A) - Cold)^2 )) )
+      
+      
+      
+      if(use.gglasso){
+        
+        fit.gglasso <- NULL
+        for(k in 1:nrank){
+          
+          if(group.size){
+            fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B, pf = sqrt(table(pvec))), silent = TRUE )
+          } else {
+            fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B, pf = rep(1, length(table(pvec))) ), silent = TRUE )
+          }
+          
+          
+          cc = 0
+          maxit.B2 <- maxit.B
+          while( class(fit)[1] == "try-error" ){
+            cc = cc + 1
+            maxit.B2 = maxit.B2 + 1e5
+            
             if(group.size){
-              fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B, pf = sqrt(table(pvec))), silent = TRUE )
+              fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B2, pf = sqrt(table(pvec))), silent = TRUE )
             } else {
-              fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B, pf = rep(1, length(table(pvec))) ), silent = TRUE )
+              fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B2, pf = rep(1, length(table(pvec))) ), silent = TRUE )
             }
             
-
-            cc = 0
-            maxit.B2 <- maxit.B
-            while( class(fit)[1] == "try-error" ){
-              cc = cc + 1
-              maxit.B2 = maxit.B2 + 1e5
-              
-              if(group.size){
-                fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B2, pf = sqrt(table(pvec))), silent = TRUE )
-              } else {
-                fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B2, pf = rep(1, length(table(pvec))) ), silent = TRUE )
-              }
-              
-              if( cc == 100 ) stop("check the gglasso part or increase the maxit.B !");
-            }
-
-            fit.gglasso[[k]] <- fit
+            if( cc == 100 ) stop("check the gglasso part or increase the maxit.B !");
           }
-          B <- do.call( "cbind", lapply(fit.gglasso, function(x) x$beta) )
+          
+          fit.gglasso[[k]] <- fit
         }
-
-
-
-        {
-          C <- tcrossprod(B, A)
-          Cold <- tcrossprod(Bold, Aold)
-
-          simplexity[it.mse, "quartimax"] <- crit.quartimax(A)
-          simplexity[it.mse, "varimax"] <- crit.varimax(A)
-
-          diff[it.mse, "Y"] <- mean( (X %*% C - X %*% Cold)^2 )
-          diff[it.mse, "A"] <- mean( (A - Aold)^2 )
-          diff[it.mse, "B"] <- mean( (B - Bold)^2 )
-          diff[it.mse, "C"] <- mean( (C - Cold)^2 )
-        }
-
-
+        B <- do.call( "cbind", lapply(fit.gglasso, function(x) x$beta) )
+        
+      } else {
+        
+        fit.B <- UpdateB_BMD(X = X, Y = Y, A = A, B = B,
+                             pvec = pvec, nrank = nrank, d = d,
+                             lam = lambda, maxit = maxit.B, eps = eps.B, threads = threads)
+        
+        B <- fit.B$B
+        
       }
-
-      if(it.mse == maxit.mse){
-        warning(paste("Algorithm didn't converge in ", it.mse, " iterations at lambda[", ll,"] !", sep = ""))
-      }
-
-      simplexity <- simplexity[1:it.mse,]
-      diff <- diff[1:it.mse,][-c(1:2),]
-
-
-      if(best & !is.null(trueB) ){
-
-        if( any( dim(B) != dim(trueB) ) ) stop("Dimension of B must be the same.")
-
-        best.cols <- rmse.best(trueB, B, best = TRUE)$cols
-        A <- A[,best.cols]
-        B <- B[,best.cols]
-
-        fit.sign <- rmse.sign.best(trueB, B)
-
-        B <- fit.sign$est
-        A <- A %*% diag(as.numeric(fit.sign$sign))
-
-      }
-
-
-      attr(B, "pvec") <- as.numeric(table(pvec))
-
-
-
-      out[[ll]] <- list(A=A, B=B, C=C,
-                        diff=diff,
-                        simplexity=simplexity,
-                        it.mse=it.mse )
-    }
-
-
-
-    # iSRRR -------------------------------------------------------------------------
-
-  } else {
-
-
-    out <- NULL
-    for( ll in 1:nlambda ){
-
-      lambda <- lambda.seq[ll]
-      if(group.size){
-        lambda <- lambda * sqrt(pik)
-      }
-      lambda_mat <- lambda
-      # lambda_mat <- matrix(lambda,p,nrank)
-
-      it.mse <- 1
-
-      diff <- matrix(NA, nrow=maxit.mse, ncol=4)
-      colnames(diff) <- c("Y", "A", "B", "C")
-      diff[1,] <- eps.mse*2
-
-      simplexity <- matrix(NA, nrow=maxit.mse, ncol=2)
-      colnames(simplexity) <- c("quartimax", "varimax")
-
-      minimum <- 9e+5
-      min.count <- 0
-      while((it.mse < maxit.mse)&( diff[it.mse,"C"] > eps.mse)){
-
-        it.mse <- it.mse + 1
-
-        if( it.mse == 2 ){
-          A <- A0
-          B <- B0
-        }
-
-
-
-        # Old A, B ----------------------------------------------------------------
-        {
-          Aold <- A
-          Bold <- B
-        }
-
-
-        # Update Q ----------------------------------------------------------------
-        if(verbose) start <- proc.time()
-
-        {
-          Q <- Update.Rotation(A, rot.method = rot.method)$rotation
-
-          A <- A %*% Q
-          B <- B %*% Q
-        }
-
-        if(verbose){
-          print("Update Q")
-          print( proc.time() - start )
-        }
-
-
-        # Update A ----------------------------------------------------------------
-        if(verbose) start <- proc.time()
-
-        {
-          A <- with( png.svd( crossprod(Y, X) %*% B ), tcrossprod( u, v ) )
-          A <- ifelse( abs(A) > cutoff, A, 0 )
-          A <- with(png.svd(A), tcrossprod(u,v))
-        }
-
-        if(verbose){
-          print("Update A")
-          print( proc.time() - start )
-        }
-
-
-
-        # Update B ----------------------------------------------------------------
-        if(verbose) start <- proc.time()
-
-        {
-          fit.B <- UpdateB_BMD(X = X, Y = Y, A = A, B = B,
-                               pvec = pvec, nrank = nrank, d = d,
-                               lam = lambda_mat, maxit = maxit.B, eps = eps.B, threads = threads)
-          # fit.B <- UpdateB_SGM(X = X, Y = Y, pvec = pvec,
-          #                      lam = lam_mat, d = d, A = A, B = B,
-          #                      nrank = nrank, eps = eps.B, maxit = maxit.B)
-
-          diff.B <- mapply(function(x,y) x[1:y], fit.B$diff, fit.B$iter)
-          iter.B <- fit.B$iter
-          B <- fit.B$B
-        }
-
-        if(verbose){
-          print("Update B")
-          print( proc.time() - start )
-        }
-
-
-
-        # Convergence ---------------------------------------------------------------------
-        {
-          C <- tcrossprod(B, A)
-          Cold <- tcrossprod(Bold, Aold)
-
-          simplexity[it.mse, "quartimax"] <- crit.quartimax(A)
-          simplexity[it.mse, "varimax"] <- crit.varimax(A)
-
-          diff[it.mse, "Y"] <- mean( (X %*% C - X %*% Cold)^2 )
-          diff[it.mse, "A"] <- mean( (A - Aold)^2 )
-          diff[it.mse, "B"] <- mean( (B - Bold)^2 )
-          diff[it.mse, "C"] <- mean( (C - Cold)^2 )
-        }
-
-
-        if( early.stop ){
-
-          minimum <- min(minimum, diff[it.mse, "C"])
-          if( diff[it.mse, "C"] > minimum ){
-            min.count <- min.count+1
-            if(min.count == 100){
-              if(verbose){
-                print("early stopping!")
-                # cat("iteration=",it.mse,"\n")
-                # cat("minimum=",minimum,"\n")
-                # cat("current MSE=",diff[it.mse, "C"],"\n")
-              }
-              break;
+      
+      
+      if(verbose) print( paste0("(2) ", mean( (tcrossprod(B,A) - Cold)^2 )) )
+      
+      
+      
+      B.norm <- function(B, pvec, group.size=FALSE){
+        
+        d <- length( table(pvec) )
+        
+        out <- NULL
+        for( i in 1:d){
+          out1 <- NULL
+          for( k in 1:ncol(B) ){
+            if(group.size){
+              out1 <- cbind( out1, norm( B[which( pvec == i ),k], "2" ) / sqrt(sum(pvec == i)) )
+            } else {
+              out1 <- cbind( out1, norm( B[which( pvec == i ),k], "2" ))
             }
-          } else {
-            min.count <- 0
+            
           }
-
+          out <- rbind( out, out1 )
         }
-
-
-        # .Machine$double.eps
-
+        
+        out
       }
-
-      if(it.mse == maxit.mse){
-        warning(paste("Algorithm didn't converge in ", it.mse, " iterations at lambda[", ll,"] !", sep = ""))
+      
+      
+      
+      {
+        C <- tcrossprod(B, A)
+        Cold <- tcrossprod(Bold, Aold)
+        
+        simplexity[it.mse, "quartimax"] <- crit.quartimax(A)
+        simplexity[it.mse, "varimax"] <- crit.varimax(A)
+        
+        mse.path[it.mse, "mse"] <- mean( Y - X %*% tcrossprod(B, A) )
+        mse.path[it.mse, "mse+B"] <- mean( Y - X %*% tcrossprod(B, A) ) + lambda * sum( B.norm(B, pvec) )
+        
+        diff[it.mse, "Y"] <- mean( (X %*% C - X %*% Cold)^2 )
+        diff[it.mse, "A"] <- mean( (A - Aold)^2 )
+        diff[it.mse, "B"] <- mean( (B - Bold)^2 )
+        diff[it.mse, "C"] <- mean( (C - Cold)^2 )
       }
-
-      simplexity <- simplexity[1:it.mse,]
-      diff <- diff[1:it.mse,][-c(1:2),]
-
-
-      if(best & !is.null(trueB) ){
-
-        if( any( dim(B) != dim(trueB) ) ) stop("Dimension of B must be the same.")
-
-        best.cols <- rmse.best(trueB, B, best = TRUE)$cols
-        A <- A[,best.cols]
-        B <- B[,best.cols]
-
-        fit.sign <- rmse.sign.best(trueB, B)
-
-        B <- fit.sign$est
-        A <- A %*% diag(as.numeric(fit.sign$sign))
-
-      }
-
-
-      attr(B, "pvec") <- as.numeric(table(pvec))
-
-
-
-      out[[ll]] <- list(A=A, B=B, C=C,
-                        diff=diff,
-                        simplexity=simplexity,
-                        it.mse=it.mse,
-                        it.B=iter.B,
-                        diff.B=diff.B )
+      
+      
     }
-
-
+    
+    end <- proc.time()
+    
+    
+    
+    
+    if(it.mse == maxit.mse){
+      warning(paste("Algorithm didn't converge in ", it.mse, " iterations at lambda[", ll,"] !", sep = ""))
+    }
+    
+    simplexity <- simplexity[1:it.mse,]
+    diff <- diff[1:it.mse,][-c(1),]
+    mse.path <- mse.path[1:it.mse,][-c(1),]
+    
+    if(best & !is.null(trueB) ){
+      
+      if( any( dim(B) != dim(trueB) ) ) stop("Dimension of B must be the same.")
+      
+      best.cols <- rmse.best(trueB, B, best = TRUE)$cols
+      A <- A[,best.cols]
+      B <- B[,best.cols]
+      
+    }
+    
+    
+    attr(B, "pvec") <- as.numeric(table(pvec))
+    
+    
+    
+    out[[ll]] <- list(A=A, B=B, C=C,
+                      mse.path=mse.path,
+                      diff=diff,
+                      simplexity=simplexity,
+                      it.mse=it.mse,
+                      time.lambda=end-start)
   }
-
-
-
-
-
-
+  
+  
 
   out
 
 }
+
+
+
+
 
 
 
@@ -733,15 +642,164 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,cutoff,params,control,trueB=NULL, use
 
 #' @export png.iSRRR.lambda
 png.iSRRR.lambda <- function(fit, idx){
-  fit$A <- fit$A[idx]
-  fit$B <- fit$B[idx]
-  fit$SSE <- fit$SSE[idx]
-  fit$diff.mse <- fit$diff.mse[idx]
-  fit$simplexity <- fit$simplexity[idx]
-  fit$iter.mse <- fit$iter.mse[idx]
+  fit$A <- fit$A[[idx]]
+  fit$B <- fit$B[[idx]]
+  fit$SSE <- fit$SSE[[idx]]
+  fit$diff.mse <- fit$diff.mse[[idx]]
+  fit$simplexity <- fit$simplexity[[idx]]
+  fit$iter.mse <- fit$iter.mse[[idx]]
+  fit$time.lambda <- fit$time.lambda[[idx]]
 
   fit
 }
 
 
 
+
+
+
+#' @export iSRRR.boot.selfreq
+iSRRR.boot.selfreq <- function(fit.boot, wh.nu){
+  
+  d <- fit.boot[[1]][[1]]$pvec %>% max
+  nlambda <- fit.boot[[1]][[1]]$params$nlambda
+  
+  
+  Structure <- lapply(1:nlambda, function(x) rbind( 0, png.GetStructure(d) ))
+  for( i in 1:length(fit.boot)){
+    
+    a <- lapply( fit.boot[[i]][[wh.nu]]$B, function(x) x %>% print.B2() %>% {ifelse(abs(.)>0,1,0)} %>% {t(t(.) %>% {.[!duplicated(.),,drop=F]})} )
+    
+    for( h in 1:nlambda ){
+      
+      aa <- a[[h]]
+      
+      for( k in 1:ncol(aa) ){
+        wh <- which( apply( Structure[[h]][-1,], 2, function(x) all(x==aa[,k]) ) )
+        Structure[[h]][1,wh] <- Structure[[h]][1,wh] + 1
+      }
+      
+      
+    }
+    
+  }
+  
+  
+  lapply(Structure, function(STR){
+    as.data.frame( t( rbind(STR[-1,], STR[1,]) ) )
+  })
+  
+  
+  
+}
+
+
+
+
+
+#' @export iSRRR.boot
+iSRRR.boot <- function(fit, X, Y, nboot=100){
+  
+  lambda.seq <- fit[[1]]$params$lambda.seq
+  nrank <- fit[[1]]$nrank
+  pvec <- fit[[1]]$pvec
+  nu <- sapply(fit, function(x) x$nu)
+  params <- fit[[1]]$params
+  control <- fit[[1]]$control
+  
+  fit.boot <- NULL
+  for( i in 1:nboot ){
+    print(i)
+    idx <- sample(1:nrow(X), replace=TRUE)
+    fit.new <- iSRRR( X = X[idx,], Y = Y[idx,], pvec = pvec,
+                  nrank = nrank,
+                  nu = nu,
+                  params=params,
+                  control=control )
+    
+    fit.boot[[i]] <- fit.new
+  }
+  
+  invisible( fit.boot )
+  
+}
+
+
+
+
+
+
+#' @export iSRRR.boot.selarray
+iSRRR.boot.selarray <- function(fit.boot){
+  
+  n.nu <- length(fit.boot[[1]])
+  d <- fit.boot[[1]][[1]]$pvec %>% max
+  
+  out.BIC <- lapply( fit.boot, function(x) x %>% png.BICmat(print.out=F) %>% {attr(., "wh.min")} %>% apply(1, function(y) paste0(y, collapse=",") ) )
+  
+  
+  Structure <- png.GetStructure(d)
+  
+  sel.array <- lapply(seq_len(n.nu), function(inu){
+    fit.selfreq <- iSRRR.boot.selfreq(fit.boot, wh.nu=inu)
+    mat <- do.call("rbind", lapply(fit.selfreq, function(x) round(x[,ncol(x)], 5) ))
+  }) %>% simplify2array()
+  
+  dimnames(sel.array) <- list(paste0("lam.", 1:dim(sel.array)[1]),
+                              paste0("S.", 1:dim(sel.array)[2]),
+                              paste0("nu.", 1:dim(sel.array)[3])
+  )
+  
+  attr(sel.array, "structure") <- Structure
+  attr(sel.array, "wh.bic") <- table(unlist(out.BIC))
+  
+  sel.array
+  
+}
+
+
+
+
+
+#' @export iSRRR.best
+iSRRR.best <- function(fit.tmp, type="acc.C"){
+  # trueA <- fit.all$train$data3$A
+  # trueB <- fit.all$train$data3$B
+  trueA <- fit.tmp[[1]]$trueA
+  trueB <- fit.tmp[[1]]$trueB
+  trueC <- tcrossprod(trueB,trueA)
+  
+  n.nu <- length(fit.tmp)
+  n.lam <- fit.tmp[[1]]$params$nlambda
+  
+  acc.A.mat <- matrix(NA, nrow=n.lam, ncol=n.nu)
+  acc.B.mat <- matrix(NA, nrow=n.lam, ncol=n.nu)
+  acc.C.mat <- matrix(NA, nrow=n.lam, ncol=n.nu)
+  rmse.B.mat <- matrix(NA, nrow=n.lam, ncol=n.nu)
+  for( inu in 1:n.nu ){
+    A.seq <- fit.tmp[[inu]]$A
+    B.seq <- fit.tmp[[inu]]$B
+    for( ilam in 1:n.lam ){
+      Ahat <- fit.tmp[[inu]]$A[[ilam]]
+      Bhat <- fit.tmp[[inu]]$B[[ilam]]
+      acc.A.mat[ilam,inu] <- acc(Ahat, trueA, perm=F)
+      acc.B.mat[ilam,inu] <- acc(Bhat, trueB, perm=F)
+      acc.C.mat[ilam,inu] <- acc(tcrossprod(Bhat, Ahat), trueC, perm=F)
+      rmse.B.mat[ilam,inu] <- rmse.best(trueB, Bhat)$min
+    }
+  }
+  
+  if(type=="acc.C"){
+    wh.best <- (acc.C.mat) %>% {which(.==max(.),arr.ind=TRUE)} %>% {.[nrow(.),]}
+  } else if(type=="acc.B"){
+    wh.best <- (acc.B.mat) %>% {which(.==max(.),arr.ind=TRUE)} %>% {.[nrow(.),]}
+  } else if(type=="rmse.B"){
+    wh.best <- (rmse.B.mat) %>% {which(.==min(.),arr.ind=TRUE)} %>% {.[nrow(.),]}
+  }
+  
+  out <- print.iSRRR(fit.tmp, wh.best[1], wh.best[2])
+  best.cols <- rmse.best(trueB, out$B)$cols
+  attr(out, "best.cols") <- best.cols
+  
+  out
+}

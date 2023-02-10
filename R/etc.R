@@ -571,8 +571,86 @@ png.accuracy <- function(true, est){
 
 
 
+acc <- function(X, true, perm=TRUE, rowwise=FALSE){
+  X <- as.matrix(X)
+  
+  mat2binary <- function(mat, eps=1e-10){
+    ifelse( abs(mat) > eps, 1, 0 )
+  }
+  
+  if(rowwise){
+    X2 <- apply( mat2binary(X), 1, function(x) any(x==1) )
+    true2 <- apply( mat2binary(true), 1, function(x) any(x==1) )
+    
+    out <- mean( X2 == true2 )
+    
+    return(out)
+  }
+  
+  if( perm ){
+    out <- perm.acc(X, true)
+  } else {
+    out <- mean( mat2binary(true) == mat2binary(X) )
+  }
+  
+  out
+}
 
 
+#' @export acc.best
+acc.best <- function(true, est, best = TRUE){
+  
+  A <- true
+  B <- est
+  
+  permutations <- function(n){
+    if(n==1){
+      return(matrix(1))
+    } else {
+      sp <- permutations(n-1)
+      p <- nrow(sp)
+      A <- matrix(nrow=n*p,ncol=n)
+      for(i in 1:n){
+        A[(i-1)*p+1:p,] <- cbind(i,sp+(sp>=i))
+      }
+      return(A)
+    }
+  }
+  
+  if( best ){
+    A <- abs(A);  B <- abs(B)
+    
+    r <- ncol(B)
+    
+    perms <- permutations(r)
+    
+    maximum <- NULL
+    # minimum <- 1000
+    for( i in 1:nrow(perms) ){
+      maximum[i] <- acc(A, B[,perms[i,]], perm=F, rowwise=F)
+    }
+    
+    out <- list( max = max(maximum),
+                 cols = unlist(perms[which.max(maximum),]),
+                 B = B[,unlist(perms[which.max(maximum),])] )
+    
+    
+    # out <- min(maximum)
+    
+  } else {
+    out <- acc(A, B, perm=F, rowwise=F)
+  }
+  
+  
+  out
+}
+
+
+
+
+
+
+#' @export rmse.best
 rmse.best <- function(true, est, best = TRUE){
 
   A <- true
@@ -660,4 +738,50 @@ crit.quartimax <- function(L){
 
 soft <- function(A, x){
   ifelse( abs(A) > x, A-sign(A-x)*x, 0 )
+}
+
+
+
+
+
+
+
+
+
+
+
+#' @export png.GetStructure
+png.GetStructure <- function(d){
+  out <- matrix(0, d, 2^d-1)
+  
+  count <- 0
+  for( i in 1:d ){
+    Combn <- combn(d,i)
+    for( j in 1:ncol(Combn) ){
+      count <- count+1
+      out[Combn[,j],count] <- 1
+    }
+  }
+  
+  cbind(0, out)
+}
+
+
+
+
+
+
+#' @export permutations
+permutations <- function(n){
+  if(n==1){
+    return(matrix(1))
+  } else {
+    sp <- permutations(n-1)
+    p <- nrow(sp)
+    A <- matrix(nrow=n*p,ncol=n)
+    for(i in 1:n){
+      A[(i-1)*p+1:p,] <- cbind(i,sp+(sp>=i))
+    }
+    return(A)
+  }
 }

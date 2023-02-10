@@ -11,6 +11,83 @@ png.fit.best <- function(fit, true){
 }
 
 
+
+#' @export
+check_constraints <- function(fit, cutoff.type="element-wise"){
+  # cutoff.type = c("element-wise", "row-wise")[1]
+  
+  eps.mse <- fit$control$eps.mse
+  
+  # Convergence
+  (wh.BIC <- fit %>% png.IC() %>% .$which.min %>% .["BIC"])
+  
+  out_convergence <- sapply(fit$diff.mse, function(xx) sum(matrix(xx,ncol=4)[,4] < eps.mse))
+  
+  # df1 <- matrix( fit$diff.mse[[wh.BIC-1]], ncol=4 )
+  df1 <- NULL
+  df2 <- matrix( fit$diff.mse[[wh.BIC]], ncol=4 )
+  
+  NROW <- max( nrow(df1), nrow(df2) )
+  # par(mfrow=c(1,2))
+  # plot_null <- range(c(df1[,4,drop=T], df2[,4,drop=T])) %>% {seq(min(.), max(.), length.out=NROW)}
+  # plot( plot_null, col="white", xlab="Iterations", ylab="MSE of C" )
+  # df1[,4,drop=T] %>% points(type="b")
+  # df2[,4,drop=T] %>% points(type="b", col="red")
+  plot( df2[,4,drop=T], type="b", xlab="Iterations", ylab="MSE of C" )
+  
+  fit$B[[wh.BIC]] %>% print.B2()
+  
+  if(!is.null(fit$trueA)) cat( "Angle of A=", png.angle(fit$trueA, fit$A[[wh.BIC]])$max, "\n" )
+  if(!is.null(fit$trueB)) cat( "Angle of B=", png.angle(fit$trueB, fit$B[[wh.BIC]])$max, "\n" )
+    
+  # 180/pi*0.004
+  
+  
+  A <- fit$A
+  nu <- fit$nu
+  
+  # Orthogonality of A
+  out_orth <- lapply( A, function(x){
+    cp <- crossprod(x)
+    cp0 <- ifelse(abs(cp)<1e-12, 0, cp)
+    Matrix::isDiagonal( ifelse(abs(cp0)<1e-12, 0, cp0) )
+  } )
+  
+  
+  # Quartimax-simple of A
+  check_quartimax <- function(A, nrep=1e4){
+    r <- ncol(A)
+    crit_quartimax <- sum( ( A )^4 )
+    for( i in 2:nrep ){
+      Q <- with( svd( matrix( runif(r*r, -1, 1), r, r ) ), tcrossprod(u, v) )
+      crit_quartimax[i] <- sum( (A %*% Q)^4 )
+    }
+    mean( crit_quartimax[-1] > crit_quartimax[1] )
+  }
+  
+  out_quartimax <- sapply( A, check_quartimax, nrep=1e3 )
+  
+  
+  # Hard-thresholding of A
+  out_threshold0 <- sapply(A, function(x){
+    ifelse(abs(x)<1e-12, 0, x)
+  })
+  
+  out_threshold <- sapply(A, function(x){
+    x <- ifelse(abs(x)<1e-12, 0, x)
+    x <- x[!apply(x, 1, function(xx) all(xx==0)),]
+    mean( apply(x, 1, function(a) ( norm(a,"2") < nu )) )
+    # mean( abs( x[x!=0] ) < nu )
+  })
+  
+  
+  OUT <- cbind( orthogonal=out_orth, quartimax=out_quartimax, convergence=out_convergence, threshold=out_threshold )
+  attr(OUT, "wh.BIC") <- wh.BIC
+  
+  OUT
+}
+
+
 #' @export BICk
 BICk <- function(X,Y,pvec){
   if(FALSE){
@@ -112,7 +189,7 @@ BICk <- function(X,Y,pvec){
 
 
 
-bic <- function(SSE, npqdr, A, B, sigma=1, use.dfA=TRUE, logarithm=FALSE){
+bic <- function(SSE, npqdr, A, B, sigma=1, use.dfA=TRUE, logarithm=TRUE){
   
   if(FALSE){
     X <- data$X
@@ -161,7 +238,7 @@ bic <- function(SSE, npqdr, A, B, sigma=1, use.dfA=TRUE, logarithm=FALSE){
   
   dfA <- sum( A !=0)
   dfB <- sum( B !=0)
-  
+  dfC <- sum( tcrossprod(B,A) !=0)
   
   # {
   #   # X %*% MASS::ginv( crossprod(X) ) %*% t(X)
@@ -182,9 +259,9 @@ bic <- function(SSE, npqdr, A, B, sigma=1, use.dfA=TRUE, logarithm=FALSE){
   
   
   if(use.dfA){
-    df <- dfA + dfB
+    df <- ifelse(dfB == 0, 9999, dfA + dfB)
   } else {
-    df <- dfB
+    df <- dfC
   }
   
   # df <- dfA + dfB * xrank/d - r^2
@@ -200,6 +277,7 @@ bic <- function(SSE, npqdr, A, B, sigma=1, use.dfA=TRUE, logarithm=FALSE){
   if( logarithm ){
     list(
       BIC = log(SSE) + log(nq) / nq * df,
+      BIC2 = log(SSE/nq) + log(nq) / nq * df,
       GIC = log(SSE) + log(log(nq)) * log(pq)/nq * df,
       AIC = log(SSE) + 2/nq * df,
       GCV = nq*SSE/(nq - df)^2,
@@ -226,7 +304,7 @@ bic <- function(SSE, npqdr, A, B, sigma=1, use.dfA=TRUE, logarithm=FALSE){
 #' @export png.IC
 #' 
 #' 
-png.IC <- function(fit, use.dfA=TRUE, sigma=1, logarithm=FALSE){
+png.IC <- function(fit, use.dfA=TRUE, sigma=1, logarithm=TRUE){
   if(FALSE){
     library(iSRRR)
     set.seed(1)
@@ -277,6 +355,7 @@ png.IC <- function(fit, use.dfA=TRUE, sigma=1, logarithm=FALSE){
   out.bic2 <- out.bic[, colnames(out.bic) != "df"]
   list( BIC = out.bic,
         which.min = apply(out.bic2, 2, which.min), 
+        which.min.new = apply(out.bic2, 2, function(x) { ifelse(which.min(x)!=1, which.min(x), min( which( x == min(x[x>min(x)]) ) ) ) } ),
         which.min2 = apply(out.bic2, 2, function(x) min( which( x == min(x[x>min(x)]) ) ) ) )
   
 }
@@ -290,7 +369,9 @@ png.angle <- function(true, est){
   qe <- qr.Q(qr(est))
   fit.svd <- svd( crossprod(qe, qt) )
   theta <- acos(fit.svd$d |> round(12))
-  list( max = theta[1], Grassmanian = norm( theta, "2" ) )
+  
+  # theta[1] * 180 / pi
+  list( max = theta[1] * 180 / pi, Grassmanian = norm( theta, "2" ) * 180 / pi )
 }
 
 
@@ -316,3 +397,45 @@ png.measure <- function(true, est){
 }
 
 
+
+
+
+#' @export print.iSRRR
+print.iSRRR <- function(fit, Lambda, Nu){
+  Ahat <- fit[[ Nu ]]$A[[ Lambda ]]
+  Bhat <- fit[[ Nu ]]$B[[ Lambda ]]
+  
+  list(A=Ahat, B=Bhat)
+}
+
+
+#' @export png.BICmat
+png.BICmat <- function(fit, logarithm=TRUE, print.out=TRUE){
+  
+  tab <- do.call("cbind", lapply( 1:length(fit), function(idx) png.IC(fit[[idx]], logarithm=logarithm)$BIC[,1] ))
+  
+  attr(tab, "wh.min") <- which( tab == min(tab), arr.ind=TRUE )
+  
+  wh.lambda <- attr(tab, "wh.min")[1,1]
+  wh.nu <- attr(tab, "wh.min")[1,2]
+  
+  if(print.out){
+    print( print.B2( fit[[wh.nu]]$B[[wh.lambda]] ) )
+    print( round( fit[[wh.nu]]$A[[wh.lambda]], 3 ) )
+    
+    if( !is.null(dim(fit[[wh.nu]]$diff.mse[[wh.lambda]])) ){
+      plot( fit[[wh.nu]]$diff.mse[[wh.lambda]][,4], type="b", xlab="Iterations", ylab="MSE of C" )
+    }
+    
+  }
+  
+  trueA <- fit[[wh.nu]]$trueA
+  trueB <- fit[[wh.nu]]$trueB
+  
+  if(!is.null(trueA)) cat( "angle of A =", png.angle( trueA, fit[[wh.nu]]$A[[wh.lambda]] )$max, "\n" )
+  if(!is.null(trueB)) cat( "angle of B =", png.angle( trueB, fit[[wh.nu]]$B[[wh.lambda]] )$max, "\n" )  
+  
+  
+  tab
+  
+}
