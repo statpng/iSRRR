@@ -8,56 +8,57 @@
 #' @param X An \code{n} by \code{p} design matrix.
 #' @param Y An \code{n} by \code{q} response matrix.
 #' @param pvec A numeric vector of the number of variable for each dataset.
-#'
 #' @param nrank The rank of matrices to be estimated.
-#'
-#' @param cutoff Hard-thresholding parameter. Default is 0 (no thresholding).
-#'
-#' @param params A list with \code{lambda.seq}=NULL, \code{nlambda}=5, \code{lambda.factor}=1e-4, \code{log.scale}=TRUE, and \code{group.size}=FALSE.
+#' @param nu Row-wise sparsity level on loading matrix A.
+#' @param params A list with \code{lambda.seq}=NULL, \code{nlambda}=5, \code{lambda.factor}=1e-4, \code{log.scale}=TRUE, and \code{group.size}=TRUE.
 #'
 #' @param control A list with \code{best}=FALSE, \code{rot.method}="quartimax" \code{maxit.B}=3e8, \code{eps.B}=1e-8, \code{maxit.mse}=50, \code{eps.mse}=1e-6, \code{X.scale}=c("group", "each"), \code{Y.scale}=FALSE, \code{verbose}=FALSE, and \code{threads}=1.
-#' @param trueB A list contains X with dimension \code{n} by \code{p} and Y with dimension \code{n} by \code{q}.
+#' @param trueA A \code{q} x \code{r} dimensional matrix for the true parameter A. This is intended for simulation purpose.
+#' @param trueB A \code{p} x \code{r} dimensional matrix for the true parameter B. This is intended for simulation purpose.
 #' 
-#' @param use.gglasso Default is TRUE.
 #' 
-#' 
-#' @return A list with output objects
+#' @return A list with output objects along with nu values
 #' 
 #' 
 #' @author Kipoong Kim <statpng@snu.ac.kr>, Sungkyu Jung <sungkyu@snu.ac.kr>
 #' 
+#' 
 #' @references
-#' No reference.
+#' Kipoong Kim and Sungkyu Jung. (2022). Integrative sparse reduced-rank regression via orthogonal rotation for analysis of high-dimensional multi-source data. Submitted.
 #'
 ### #' @keywords "Data integration" "Multi-source data" "Orthogonal rotation" "Reduced-rank regression" "Structural learning"
 #' @examples 
-#' 
-#' if(FALSE){
-#' 
-#' fit <- iSRRR( X = data$X, Y = data$Y, pvec = data$pvec,
-#' nrank = data$nrank,
-#' nu = c(0:4*0.1),
-#' params=list(nlambda=10, lambda.factor=1e-4),
-#' control=list(best=TRUE, maxit.mse=20, eps.mse=1e-8,
-             #' maxit.B=6e6, eps.B=1e-6),
-#' trueA = data$A, trueB = data$B )
-#' }
+#' # test
 #'
 #' @importFrom gglasso gglasso
 #' @import Rcpp
 #' @importFrom MASS ginv
+#' @importFrom dplyr "%>%"
 #' @useDynLib iSRRR
 #'
 #' @export arcov
 #' 
 #' @export iSRRR
-iSRRR <- function(X, Y, pvec, nrank, nu, params=NULL, control=NULL, trueA=NULL, trueB=NULL, methodA="hard"){
+iSRRR <- function(X, Y, pvec, nrank, nu, params=NULL, control=NULL, trueA=NULL, trueB=NULL){
 
   if(FALSE){
+    if(FALSE){
+     data(iSRRR.data)
+     data(iSRRR.fit)
+     data(iSRRR.boot)
+
+    fit <- iSRRR( X = data$X, Y = data$Y, pvec = data$pvec,
+    nrank = data$nrank,
+    nu = c(0:4*0.1),
+    params=list(nlambda=10, lambda.factor=1e-4),
+    control=list(best=TRUE, maxit.mse=20, eps.mse=1e-8,
+    maxit.B=6e6, eps.B=1e-6),
+    trueA = data$A, trueB = data$B )
+    }
+    
     fit <- iSRRR( X = data$X, Y = data$Y, pvec = data$pvec,
                   nrank = data$nrank,
                   nu = c(0:4*0.1),
-                  methodA="hard",
                   params=list(nlambda=10, lambda.factor=1e-5),
                   control=list(best=TRUE, maxit.mse=200, eps.mse=1e-12,
                   maxit.B=3e6, eps.B=1e-8),
@@ -65,45 +66,8 @@ iSRRR <- function(X, Y, pvec, nrank, nu, params=NULL, control=NULL, trueA=NULL, 
   }
   
   
-  if(FALSE){
-    X = data$X; Y = data$Y; pvec = data$pvec;
-    nrank = data$nrank;
-    nu = (0:4*0.1);
-    params=list(nlambda=10, lambda.factor=1e-4);
-    control=list(best=TRUE, maxit.mse=100, eps.mse=1e-12, 
-                 maxit.B=3e6, eps.B=1e-6);
-    trueA = data$A; trueB = data$B
-    methodA <- "hard"
-    
-    X = X
-    Y = Y
-    pvec = pvec
-    nrank = 2
-    nu = c(0:4*0.1)[4]
-    methodA="hard"
-    params=list(nlambda=10, lambda.factor=1e-4)
-    control=list(best=TRUE, maxit.mse=200, eps.mse=1e-10,
-                 maxit.B=1e4, eps.B=1e-4)
-    trueA=NULL
-    trueB=NULL
-    
-    
-    
-    X = data$X
-    Y = data$Y
-    pvec = data$pvec
-    nrank = data$nrank
-    nu = c(0,0.1,0.2)[1]
-    params=list(nlambda=20, lambda.factor=1e-4)
-    control=list(best=TRUE, maxit.mse=200, eps.mse=1e-10, 
-                 maxit.B = 3e8, eps.B = 1e-10) 
-    trueA=data$A
-    trueB=data$B
-  }
-  
-  
-  
   if( length(pvec) != ncol(X) ) stop("pvec == ncol(X)")
+  
   
   
   
@@ -127,6 +91,7 @@ iSRRR <- function(X, Y, pvec, nrank, nu, params=NULL, control=NULL, trueA=NULL, 
 
     best <- control$best
     rot.method <- control$rot.method
+    methodA <- control$methodA
     maxit.B <- control$maxit.B
     eps.B <- control$eps.B
     maxit.mse <- control$maxit.mse
@@ -143,7 +108,8 @@ iSRRR <- function(X, Y, pvec, nrank, nu, params=NULL, control=NULL, trueA=NULL, 
 
   n <- nrow(Y);  p <- length(pvec);
   d <- max(pvec);  q <- ncol(Y)
-
+  
+  
 
   
   fit.init <- get.init(X=X, Y=Y, pvec=pvec, nrank=nrank, lambda.seq=lambda.seq, lambda.factor=lambda.factor, nlambda=nlambda, log.scale=log.scale, group.size=group.size)
@@ -213,7 +179,11 @@ iSRRR <- function(X, Y, pvec, nrank, nu, params=NULL, control=NULL, trueA=NULL, 
 
 #' @export get.init
 get.init <- function(X, Y, pvec, nrank, lambda.seq, lambda.factor, nlambda, log.scale, group.size){
-  d <- max(pvec)
+  
+  n <- nrow(Y);  p <- length(pvec);
+  d <- max(pvec);  q <- ncol(Y)
+  
+  
 
   C.init <- crossprod(with( png.svd(X), u %*% diag(1/d) %*% t(v) ), Y)
 
@@ -262,6 +232,7 @@ default.params <- function(){
   control0 = list(
     best = FALSE,
     rot.method = "quartimax", # c("varimax", "quartimax", "oblimin", "oblimax", "infomax", "CF", "McCammon", "simplimax", "tandem", "entropy"),
+    methodA = "hard",
     maxit.B = 1e6,
     eps.B = 1e-6,
     maxit.mse = 20,
@@ -287,7 +258,10 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
 
   n <- nrow(Y);  p <- length(pvec);
   d <- max(pvec);  q <- ncol(Y)
-  r <- nrank
+  
+  
+  
+  
 
   {
 
@@ -312,15 +286,18 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
   }
 
 
-
-
-  pik <- replicate(nrank, as.numeric(table(pvec)))
   nlambda <- length(lambda.seq)
+  
+  if(group.size){
+    gr.size <- table(pvec)
+  } else {
+    gr.size <- rep(1, d)
+  }
+  
 
 
 
 
-  # iSRRR -----------------------------------------------------------------
   
   out <- NULL
   for( ll in 1:nlambda ){
@@ -328,9 +305,7 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
     start <- proc.time()
     
     lambda <- lambda.seq[ll]
-    # if(group.size){
-    #   lambda <- lambda * sqrt(pik)[,1]
-    # }
+    
     
     it.mse <- 1
     
@@ -363,7 +338,9 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
       
       
       
-      
+
+      # A step ------------------------------------------------------------------
+
       if(methodA == "hard"){
         
         A <- with( png.svd( crossprod(Y, X) %*% B ), tcrossprod( u, v ) )
@@ -388,6 +365,9 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
       }
       
       
+
+      # Q step ------------------------------------------------------------------
+
       Q <- Update.Rotation(A, rot.method = rot.method)$rotation
       
       A <- A %*% Q
@@ -400,16 +380,17 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
       
       
       
+
+      # B step ------------------------------------------------------------------
+
       if(use.gglasso){
         
         fit.gglasso <- NULL
         for(k in 1:nrank){
           
-          if(group.size){
-            fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B, pf = sqrt(table(pvec))), silent = TRUE )
-          } else {
-            fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B, pf = rep(1, length(table(pvec))) ), silent = TRUE )
-          }
+          
+          fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B, pf = sqrt(gr.size)), silent = TRUE )
+          
           
           
           cc = 0
@@ -418,11 +399,9 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
             cc = cc + 1
             maxit.B2 = maxit.B2 + 1e5
             
-            if(group.size){
-              fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B2, pf = sqrt(table(pvec))), silent = TRUE )
-            } else {
-              fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B2, pf = rep(1, length(table(pvec))) ), silent = TRUE )
-            }
+            
+            fit <- try( gglasso(X, Y %*% A[,k], group = pvec, lambda = lambda, loss = "ls", eps = eps.B, maxit = maxit.B2, pf = sqrt(gr.size)), silent = TRUE )
+            
             
             if( cc == 100 ) stop("check the gglasso part or increase the maxit.B !");
           }
@@ -435,7 +414,7 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
         
         fit.B <- UpdateB_BMD(X = X, Y = Y, A = A, B = B,
                              pvec = pvec, nrank = nrank, d = d,
-                             lam = lambda, maxit = maxit.B, eps = eps.B, threads = threads)
+                             lam = lambda * sqrt(gr.size), maxit = maxit.B, eps = eps.B, threads = threads)
         
         B <- fit.B$B
         
@@ -445,30 +424,10 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
       if(verbose) print( paste0("(2) ", mean( (tcrossprod(B,A) - Cold)^2 )) )
       
       
-      
-      B.norm <- function(B, pvec, group.size=FALSE){
-        
-        d <- length( table(pvec) )
-        
-        out <- NULL
-        for( i in 1:d){
-          out1 <- NULL
-          for( k in 1:ncol(B) ){
-            if(group.size){
-              out1 <- cbind( out1, norm( B[which( pvec == i ),k], "2" ) / sqrt(sum(pvec == i)) )
-            } else {
-              out1 <- cbind( out1, norm( B[which( pvec == i ),k], "2" ))
-            }
-            
-          }
-          out <- rbind( out, out1 )
-        }
-        
-        out
-      }
-      
-      
-      
+    
+
+      # Criteria ----------------------------------------------------------------
+
       {
         C <- tcrossprod(B, A)
         Cold <- tcrossprod(Bold, Aold)
@@ -477,7 +436,7 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
         simplexity[it.mse, "varimax"] <- crit.varimax(A)
         
         mse.path[it.mse, "mse"] <- mean( Y - X %*% tcrossprod(B, A) )
-        mse.path[it.mse, "mse+B"] <- mean( Y - X %*% tcrossprod(B, A) ) + lambda * sum( B.norm(B, pvec) )
+        mse.path[it.mse, "mse+B"] <- mean( Y - X %*% tcrossprod(B, A) ) + lambda * sum( print.B(B=B, pvec=table(pvec), type="norm", group.size=TRUE ) )
         
         diff[it.mse, "Y"] <- mean( (X %*% C - X %*% Cold)^2 )
         diff[it.mse, "A"] <- mean( (A - Aold)^2 )
@@ -501,6 +460,10 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
     diff <- diff[1:it.mse,][-c(1),]
     mse.path <- mse.path[1:it.mse,][-c(1),]
     
+    
+    
+    # Best B for simulation purpose -------------------------------------------
+
     if(best & !is.null(trueB) ){
       
       if( any( dim(B) != dim(trueB) ) ) stop("Dimension of B must be the same.")
@@ -524,8 +487,6 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
                       time.lambda=end-start)
   }
   
-  
-
   out
 
 }
@@ -633,6 +594,30 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
 
 
 
+#' @export iSRRR.lambda
+iSRRR.lambda <- function(X, Y, pvec, nrank, nlambda = 10, lambda.factor = 1e-3, log.scale=TRUE, group.size=TRUE){
+  
+  n <- nrow(Y);  p <- length(pvec);
+  d <- max(pvec);  q <- ncol(Y)
+  r <- nrank
+  
+  
+  C.init <- crossprod(with( png.svd(X), u %*% diag(1/d) %*% t(v) ), Y)
+  
+  
+  coefSVD <- png.svd(C.init)
+  coefSVD$u <- coefSVD$u[, 1:r, drop = FALSE]
+  coefSVD$d <- coefSVD$d[1:r]
+  coefSVD$v <- coefSVD$v[, 1:r, drop = FALSE]
+  
+  A0 <- coefSVD$v
+  B0 <- with(coefSVD, u %*% diag(d, r, r))
+  
+  lambda.seq <- lambda_sequence(X, Y, A0, pvec=pvec, nlambda=nlambda, lambda.factor = lambda.factor, log.scale=log.scale, group.size=group.size)
+  
+  list( lambda.seq=lambda.seq, nlambda=nlambda, lambda.factor=lambda.factor)
+  
+}
 
 
 
@@ -640,8 +625,13 @@ fit.iSRRR <- function(X,Y,A0,B0,pvec,nrank,nu,methodA,params,control,trueB=NULL,
 
 
 
-#' @export png.iSRRR.lambda
-png.iSRRR.lambda <- function(fit, idx){
+
+
+
+
+
+#' @export iSRRR.choose.Lambda
+iSRRR.choose.Lambda <- function(fit, idx){
   fit$A <- fit$A[[idx]]
   fit$B <- fit$B[[idx]]
   fit$SSE <- fit$SSE[[idx]]
@@ -653,45 +643,14 @@ png.iSRRR.lambda <- function(fit, idx){
   fit
 }
 
-
-
-
-
-
-#' @export iSRRR.boot.selfreq
-iSRRR.boot.selfreq <- function(fit.boot, wh.nu){
+#' @export iSRRR.choose.LambdaNu
+iSRRR.choose.LambdaNu <- function(fit, Lambda, Nu){
+  Ahat <- fit[[ Nu ]]$A[[ Lambda ]]
+  Bhat <- fit[[ Nu ]]$B[[ Lambda ]]
   
-  d <- fit.boot[[1]][[1]]$pvec %>% max
-  nlambda <- fit.boot[[1]][[1]]$params$nlambda
-  
-  
-  Structure <- lapply(1:nlambda, function(x) rbind( 0, png.GetStructure(d) ))
-  for( i in 1:length(fit.boot)){
-    
-    a <- lapply( fit.boot[[i]][[wh.nu]]$B, function(x) x %>% print.B2() %>% {ifelse(abs(.)>0,1,0)} %>% {t(t(.) %>% {.[!duplicated(.),,drop=F]})} )
-    
-    for( h in 1:nlambda ){
-      
-      aa <- a[[h]]
-      
-      for( k in 1:ncol(aa) ){
-        wh <- which( apply( Structure[[h]][-1,], 2, function(x) all(x==aa[,k]) ) )
-        Structure[[h]][1,wh] <- Structure[[h]][1,wh] + 1
-      }
-      
-      
-    }
-    
-  }
-  
-  
-  lapply(Structure, function(STR){
-    as.data.frame( t( rbind(STR[-1,], STR[1,]) ) )
-  })
-  
-  
-  
+  list(A=Ahat, B=Bhat)
 }
+
 
 
 
@@ -728,6 +687,36 @@ iSRRR.boot <- function(fit, X, Y, nboot=100){
 
 
 
+iSRRR.boot.selfreq <- function(fit.boot, wh.nu){
+  
+  d <- max( fit.boot[[1]][[1]]$pvec )
+  nlambda <- fit.boot[[1]][[1]]$params$nlambda
+  
+  
+  Structure <- lapply(1:nlambda, function(x) rbind( 0, GetStructure(d) ))
+  for( i in 1:length(fit.boot)){
+    
+    a <- lapply( fit.boot[[i]][[wh.nu]]$B, function(x) x %>% print.B2() %>% {ifelse(abs(.)>0,1,0)} %>% {t(t(.) %>% {.[!duplicated(.),,drop=F]})} )
+    
+    for( h in 1:nlambda ){
+      
+      aa <- a[[h]]
+      
+      for( k in 1:ncol(aa) ){
+        wh <- which( apply( Structure[[h]][-1,], 2, function(x) all(x==aa[,k]) ) )
+        Structure[[h]][1,wh] <- Structure[[h]][1,wh] + 1
+      }
+    }
+  }
+  
+  lapply(Structure, function(STR){
+    as.data.frame( t( rbind(STR[-1,], STR[1,]) ) )
+  })
+  
+}
+
+
+
 
 #' @export iSRRR.boot.selarray
 iSRRR.boot.selarray <- function(fit.boot){
@@ -738,7 +727,7 @@ iSRRR.boot.selarray <- function(fit.boot){
   out.BIC <- lapply( fit.boot, function(x) x %>% png.BICmat(print.out=F) %>% {attr(., "wh.min")} %>% apply(1, function(y) paste0(y, collapse=",") ) )
   
   
-  Structure <- png.GetStructure(d)
+  Structure <- GetStructure(d)
   
   sel.array <- lapply(seq_len(n.nu), function(inu){
     fit.selfreq <- iSRRR.boot.selfreq(fit.boot, wh.nu=inu)
@@ -803,3 +792,6 @@ iSRRR.best <- function(fit.tmp, type="acc.C"){
   
   out
 }
+
+
+

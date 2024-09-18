@@ -1,44 +1,38 @@
 #' @importFrom gtools mixedsort
+#' @importFrom SIS SIS
+#' 
+#' 
 #' @export print.B
-print.B <- function(B, pvec=NULL, type=c("norm", "head", "prop"), top=1, rowwise=FALSE){
+print.B <- function(B, pvec, type="norm", top=2, group.size=FALSE){
+  # type=c("norm", "head", "prop")[1]
+  # group.size=FALSE
+  # top=2
+  # pvec <- attr(B, "pvec")
   
-  if(FALSE){
-    B <- fit$B[[4]]
+  d <- length(pvec)
+  pvec2 <- rep( 1:d, pvec )
+  
+  if(group.size){
+    gr.size <- table(pvec2)
+  } else {
+    gr.size <- rep(1, d)
   }
-  
-  if( is.null(pvec) ){
-    pvec2 <- attr(B, "pvec")
-    pvec <- rep( 1:length(pvec2), pvec2 )
-  }
-  d <- max(pvec)
-  
   
   out <- NULL
   for( i in 1:d){
-    
-    if(!rowwise){
-      out1 <- NULL
-      for( k in 1:ncol(B) ){
-        
-        if( type == "head" ){
-          out1 <- cbind( out1, B[which( pvec == i )[1:top], k] )
-        } else if(type == "norm"){
-          out1 <- cbind( out1, norm( B[which( pvec == i ), k], "2") )
-        } else if(type == "prop"){
-          out1 <- cbind( out1, mean( abs( B[which( pvec == i ), k] ) > 1e-10 ) )
-        }
-        
-      }
-    } else {
+  
+    out1 <- NULL
+    for( k in 1:ncol(B) ){
+      
       if( type == "head" ){
-        out1 <- B[which( pvec == i )[1:top], ]
+        out1 <- cbind( out1, B[which( pvec2 == i )[1:top], k] )
       } else if(type == "norm"){
-        out1 <- norm( B[which( pvec == i ), ], "2")
+        out1 <- cbind( out1, norm( B[which( pvec2 == i ), k], "2") / gr.size[i] )
       } else if(type == "prop"){
-        out1 <- mean( apply(B[which( pvec == i ), ], 1, function(x) abs( x ) > 1e-10 ) )
+        out1 <- cbind( out1, mean( abs( B[which( pvec2 == i ), k] ) > 1e-10 ) )
       }
+      
     }
-    
     
     out <- rbind( out, out1 )
     
@@ -46,6 +40,12 @@ print.B <- function(B, pvec=NULL, type=c("norm", "head", "prop"), top=1, rowwise
   
   round( out, 4)
 }
+
+
+
+
+
+
 
 
 #' @export print.B2
@@ -78,6 +78,7 @@ print.B2 <- function(B, top=1, group.size=FALSE){
 
 
 
+
 #' @export png.duplicated
 png.duplicated <- function(A){
   a <- A
@@ -87,6 +88,7 @@ png.duplicated <- function(A){
   colnames(out) <- NULL
   out
 }
+
 
 
 
@@ -112,6 +114,7 @@ png.df.rename <- function(df, names){
 }
 
 
+
 #' @export png.list2str
 png.list2str <- function(params){
   p1 <- lapply(params, function(x) ifelse(length(x)>=10, paste0(x[c(1,length(x))], collapse = "-"), paste0(x, collapse = "+") ) )
@@ -125,6 +128,7 @@ png.list2str <- function(params){
   
   p3
 }
+
 
 
 #' @export png.assign.list
@@ -149,115 +153,19 @@ png.assign.list <- function(params){
 }
 
 
-#' @export png.lambda
-png.lambda <- function(X, Y, pvec, nlambda = 10, lambda.factor = 0.05){
-  
-  if(FALSE){
-    Yk <- Y %*% A[,1]
-    nlambda <- 10
-    lambda.factor = 0.05
-    
-    # gglasso::gglasso(X, Yk, group=pvec, nlambda = 11, lambda.factor = 0.05)
-    # ll <- lambda_sequence(X, Yk, pvec, nlambda = 11, lambda.factor = 0.05)
-    # lamfix(ll)
-  }
 
-  
-  n <- nrow(Y);  p <- length(pvec);
-  d <- max(pvec);  q <- ncol(Y)
-  
-  C.init <- crossprod(with( png.svd(X), u %*% diag(1/d) %*% t(v) ), Y)
-  
-  r <- 1
-  
-  coefSVD <- png.svd(C.init)
-  coefSVD$u <- coefSVD$u[, 1:r, drop = FALSE]
-  coefSVD$d <- coefSVD$d[1:r]
-  coefSVD$v <- coefSVD$v[, 1:r, drop = FALSE]
-  
-  A0 <- coefSVD$v
-  B0 <- with(coefSVD, u %*% diag(d, r, r))
-  
-  lambda.seq <- lambda_sequence(X, Y, A0, pvec=pvec, nlambda=nlambda, lambda.factor = lambda.factor)
-  
-  
-  list( lambda.seq=lambda.seq, nlambda=nlambda, lambda.factor=lambda.factor)
-  
+
+
+lamfix <- function(lam) {
+  llam <- log(lam)
+  lam[1] <- exp(2 * llam[2] - llam[3])
+  lam
 }
 
 
-
-
 #' @export lambda_sequence
-lambda_sequence <- function(X, Y, A, pvec, nlambda = 10, lambda.factor = 0.05, log.scale=FALSE, group.size=FALSE){
+lambda_sequence <- function(X, Y, A, pvec, nlambda = 10, lambda.factor = 1e-3, log.scale=TRUE, group.size=TRUE){
 
-  if(FALSE){
-    {
-      
-      data1 <- simdata(typeA="sparse0.2", typeB="partial", n=10, d=3, q=10, pvec=rep(5,3), rvec=rep(2,3), es="3", simplify=TRUE, snr=1.0)
-      data2 <- simdata(typeA="sparse0.2", typeB="partial", n=500, d=3, q=10, pvec=rep(5,3), rvec=rep(2,3), es="3", simplify=TRUE, snr=1.0)
-      
-      data <- data1
-      l1 <- get.init(data$X, data$Y, data$pvec, ncol(data$B), NULL, 1e-3, 0, 5)$lambda.seq
-      fit1 <- iSRRR(data$X, data$Y, data$pvec, ncol(data$B), 0.2, params=list(lambda.seq=l1), control=NULL, trueB=data$B)
-      
-      data <- data2
-      l2 <- get.init(data$X, data$Y, data$pvec, ncol(data$B), NULL, 1e-3, 0, 5)$lambda.seq
-      fit2 <- iSRRR(data$X, data$Y, data$pvec, ncol(data$B), 0.2, params=list(lambda.seq=l2), control=NULL, trueB=data$B)
-      
-      fit1$B[[2]] |> print.B()
-      fit2$B[[2]] |> print.B()
-      
-      #######################
-      
-      res <- res1
-      
-      X <- res$fit$X
-      Y <- res$fit$Y
-      pvec <- res$fit$pvec
-      nrank <- res$fit$nrank
-      lambda.seq <- NULL
-      lambda.factor <- res$fit$params$lambda.factor
-      gamma <- res$fit$params$gamma
-      nlambda <- res$fit$params$nlambda
-      
-      
-      d <- max(pvec)
-      
-      C.init <- crossprod(with( png.svd(X), u %*% diag(1/d) %*% t(v) ), Y)
-      
-      ## equivalently
-      # Sxx <- crossprod(X)
-      # Syx <- crossprod(Y, X)
-      # Sxx_inv <- MASS::ginv(Sxx)
-      # C.init <- tcrossprod(Sxx_inv, Syx)
-      
-      coefSVD <- png.svd(C.init)
-      coefSVD$u <- coefSVD$u[, 1:nrank, drop = FALSE]
-      coefSVD$d <- coefSVD$d[1:nrank]
-      coefSVD$v <- coefSVD$v[, 1:nrank, drop = FALSE]
-      
-      A <- coefSVD$v
-      # A0 <- coefSVD$v
-      # B0 <- with(coefSVD, u %*% diag(d, nrank, nrank))
-      
-    }
-    
-    
-    Yk <- Y %*% A[,1]
-    nlambda <- 10
-    lambda.factor = 0.05
-
-    # gglasso::gglasso(X, Yk, group=pvec, nlambda = 11, lambda.factor = 0.05)
-    # ll <- lambda_sequence(X, Yk, pvec, nlambda = 11, lambda.factor = 0.05)
-    # lamfix(ll)
-  }
-
-  
-  
-  
-  
-  
   big <- 9.9e30
   bs <- ifelse( group.size, as.integer(as.numeric(table(pvec))), 1 )
   d <- max(pvec)
@@ -278,7 +186,6 @@ lambda_sequence <- function(X, Y, A, pvec, nlambda = 10, lambda.factor = 0.05, l
   }
 
 
-
   if( log.scale ){
     
     flmin <- max(1e-6, lambda.factor)
@@ -294,17 +201,7 @@ lambda_sequence <- function(X, Y, A, pvec, nlambda = 10, lambda.factor = 0.05, l
         al[i] <- al[i-1] * alf
       }
     }
-    
-    
-    
-    lamfix <- function(lam) {
-      llam <- log(lam)
-      lam[1] <- exp(2 * llam[2] - llam[3])
-      lam
-    }
-    
-    
-    
+
     lamfix( al )
     
   } else {
@@ -320,6 +217,7 @@ lambda_sequence <- function(X, Y, A, pvec, nlambda = 10, lambda.factor = 0.05, l
   
 
 }
+
 
 
 
@@ -597,26 +495,32 @@ acc <- function(X, true, perm=TRUE, rowwise=FALSE){
 }
 
 
+
+#' @export permutations
+permutations <- function(n){
+  if(n==1){
+    return(matrix(1))
+  } else {
+    sp <- permutations(n-1)
+    p <- nrow(sp)
+    A <- matrix(nrow=n*p,ncol=n)
+    for(i in 1:n){
+      A[(i-1)*p+1:p,] <- cbind(i,sp+(sp>=i))
+    }
+    return(A)
+  }
+}
+
+
+
+
 #' @export acc.best
 acc.best <- function(true, est, best = TRUE){
   
   A <- true
   B <- est
   
-  permutations <- function(n){
-    if(n==1){
-      return(matrix(1))
-    } else {
-      sp <- permutations(n-1)
-      p <- nrow(sp)
-      A <- matrix(nrow=n*p,ncol=n)
-      for(i in 1:n){
-        A[(i-1)*p+1:p,] <- cbind(i,sp+(sp>=i))
-      }
-      return(A)
-    }
-  }
-  
+
   if( best ){
     A <- abs(A);  B <- abs(B)
     
@@ -656,19 +560,6 @@ rmse.best <- function(true, est, best = TRUE){
   A <- true
   B <- est
 
-  permutations <- function(n){
-    if(n==1){
-      return(matrix(1))
-    } else {
-      sp <- permutations(n-1)
-      p <- nrow(sp)
-      A <- matrix(nrow=n*p,ncol=n)
-      for(i in 1:n){
-        A[(i-1)*p+1:p,] <- cbind(i,sp+(sp>=i))
-      }
-      return(A)
-    }
-  }
 
   if( best ){
     A <- abs(A);  B <- abs(B)
@@ -750,8 +641,8 @@ soft <- function(A, x){
 
 
 
-#' @export png.GetStructure
-png.GetStructure <- function(d){
+#' @export GetStructure
+GetStructure <- function(d){
   out <- matrix(0, d, 2^d-1)
   
   count <- 0
@@ -784,4 +675,52 @@ permutations <- function(n){
     }
     return(A)
   }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+#' @export X.standardize
+X.standardize <- function(Xlist, center=FALSE, scale=TRUE){
+  
+  d <- length(Xlist)
+  
+  for( i in 1:d ){
+    
+    if(center) Xlist[[i]] <- scale(Xlist[[i]], center = TRUE, scale=FALSE)
+    
+    if(scale){
+      FNorm <- norm( Xlist[[i]], "F" )
+      Xlist[[i]] <- Xlist[[i]] / FNorm
+    }
+    
+  }
+  Xlist
+}
+
+
+
+
+#' @export mSIS
+mSIS <- function(X, Y, nsis=10, iter=FALSE, ...){
+  q <- ncol(Y)
+  
+  idx <- NULL
+  for( h in 1:q ){
+    y <- Y[,h]
+    fit.sis <- SIS(X, y, family="gaussian", nsis=nsis, iter = iter, ...)
+    
+    idx[[h]] <- fit.sis$sis.ix0
+  }
+  
+  sort( unique( unlist(idx) ) )
+  
 }

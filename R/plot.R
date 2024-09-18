@@ -1,9 +1,11 @@
 #' @import ggplot2
-#' @import plyr
+#' @importFrom plyr adply
 #' @import plot.matrix
 #' 
-#' @export png.iSRRR.plot
-png.iSRRR.plot <- function(List, filename=NULL, print=TRUE, order=TRUE, order.ref=1, order.type=c("col", "row", "both", "none"), width=10, height=20, legend.bar.width=40, legend.bar.height=0.3){
+#' @export iSRRR.plot.C.list
+iSRRR.plot.C.list <- function(List, filename=NULL, print=TRUE, order=TRUE, order.ref=1, order.type=c("none", "col", "row", "both"), width=10, height=20, legend.bar.width=40, legend.bar.height=0.3){
+  
+  if( length(order.type)>1 ) order.type <- "none"
 
   if(FALSE){
     filename=NULL
@@ -17,14 +19,7 @@ png.iSRRR.plot <- function(List, filename=NULL, print=TRUE, order=TRUE, order.re
     legend.bar.height=0.3
   }
 
-  # B.list <- list(iSRRR0 = iSRRR.fit$B[[1]],
-  #                iSRRR0.1 = iSRRR.fit$B[[2]],
-  #                iSRRR0.2 = iSRRR.fit$B[[3]],
-  #                srrr = fit.others$out$srrr$B,
-  #                # rssvd = with(fit.others5$out$rssvd,U%*%D),
-  #                sofar = with(fit.others$out$sofar,U%*%D),
-  #                secure = with(fit.others$out$secure,U%*%D) )
-
+  
   if(is.null(filename)) filename <- deparse(substitute(List))
 
   Names.List <- names(List)
@@ -50,15 +45,11 @@ png.iSRRR.plot <- function(List, filename=NULL, print=TRUE, order=TRUE, order.re
   colnames(DF) <- c("x", "y", "method", "value")
   DF$x <- as.numeric(as.character(DF$x))
   DF$y <- as.numeric(as.character(DF$y))
-  DF$method <- factor(DF$method,
-                        levels = c("iSRRR0.0", "iSRRR0.1", "iSRRR0.2"),
-                        labels = c( bquote(nu == 0.0), bquote(nu == 0.1), bquote(nu == 0.2) ) )
+  # DF$method <- factor(DF$method,
+  #                       levels = c("iSRRR0.0", "iSRRR0.1", "iSRRR0.2"),
+  #                       labels = c( bquote(nu == 0.0), bquote(nu == 0.1), bquote(nu == 0.2) ) )
 
-  # DF |> head()
-
-  #
-  #
-  #
+  
 
   DF.new <- DF
 
@@ -113,6 +104,13 @@ png.iSRRR.plot <- function(List, filename=NULL, print=TRUE, order=TRUE, order.re
 
 }
 
+
+
+#' @importFrom corrplot corrplot
+#' @export iSRRR.Y.corrplot
+iSRRR.Y.corrplot <- function(Y){
+  corrplot::corrplot(Y, method="square", tl.pos="n", cl.pos="b", cl.ratio=0.06)
+}
 
 
 
@@ -300,3 +298,194 @@ png.image <- function(mat, binary=FALSE, col.type=2){
 
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#' @export Chat.remove.outlier
+Chat.remove.outlier <- function(Chat){
+  x <- Chat
+  x[ x > quantile(x, 0.99)] <- max(x) - (max(x) - quantile(x, 0.99))*0.5
+  x[ x < quantile(x, 0.01)] <- min(x) + (quantile(x, 0.01) - min(x))*0.5
+  x
+}
+
+
+#' @export iSRRR.C.heatmap
+iSRRR.C.heatmap <- function(Chat, 
+                            legend.bar.width=20, 
+                            legend.bar.height=0.3){
+  dimnames(Chat) <- NULL
+  
+  Chat.df <- adply( as.array(Chat), 1:2 )
+  colnames(Chat.df) <- c("x", "y", "value")
+  Chat.df$x <- as.numeric(as.character(Chat.df$x))
+  Chat.df$y <- as.numeric(as.character(Chat.df$y))
+  
+  
+  DF.new <- Chat.df
+  DF.new$value <- Chat.remove.outlier(DF.new$value)
+  
+  
+  # legend.bar.width <- 30
+  # legend.bar.height <- 0.3
+  
+  
+  plt <- DF.new %>% 
+    cbind.data.frame(w=2, h=2) |>
+    # dplyr::filter( grepl("ssrrr",method) ) |>
+    ggplot(aes(x=y,y=max(x)-x+1,fill=value)) +
+    # ggplot(aes(y=x,x=y,fill=ifelse(abs(value)>1e-10,1,0)))+
+    # geom_tile(color="grey80", size=0.001) +
+    geom_tile(color=NA, size=0.001) +
+    # scale_fill_gradient2(low = "#AB3027",
+    #                      mid = "white",
+    #                      # mid = "#D2FBC5",
+    #                      # mid = "#FFFFC2",
+    #                      high = "#0F1BBF") +
+    # scale_fill_binned(type="viridis") +
+    # scale_fill_steps(low = "red",
+    #                      # mid = "white",
+    #                      high = "blue") +
+    # scale_fill_continuous_divergingx(palette = 'RdBu', mid = 0) + 
+    scale_fill_gradient2(low = "red",
+                         mid = "white",
+                         high = "blue") +
+    scale_x_discrete(expand = c(0,0)) +
+    scale_y_discrete(expand = c(0,0)) +
+    theme_bw(base_size = 10) +
+    theme(legend.position = "bottom",
+          axis.title = element_blank(),
+          axis.ticks = element_blank(),
+          # panel.border = element_blank(),
+          axis.text = element_blank() ) +
+    guides(fill = guide_colorbar(title = "",
+                                 label.position = "bottom",
+                                 title.position = "left",
+                                 title.vjust = 1,
+                                 frame.colour = "black",
+                                 barwidth = legend.bar.width,
+                                 barheight = legend.bar.height))
+  
+  
+  plt +
+    annotate("text", x = -2.8, y = sum(c(558, 476, 409, 502/2)), label = "Exp", angle=90) +
+    annotate("text", x = -2.8, y = sum(c(558, 476, 409/2)), label = "Mut", angle=90) +
+    annotate("text", x = -2.8, y = sum(c(558, 476/2)), label = "Met", angle=90) +
+    annotate("text", x = -2.8, y = sum(c(558/2)), label = "Cop", angle=90) +
+    theme(plot.margin = margin(.6,.6,.6,.6, "cm")) +
+    coord_cartesian(xlim=c(-1,53), clip = "off")
+  
+  # dim(Y)
+  # # [1] 57 53
+  # X.list %>% names
+  # # [1] "Exp" "Mut" "Met" "Cop"
+  # # 502 409 476 558 
+  
+  
+}
+
+
+
+
+#' @export summary.boot.Chat
+summary.boot.Chat <- function(fit.boot, wh.tune=c(2,3)){
+  
+  opt.lam <- wh.tune[1]
+  opt.nu <- wh.tune[2]
+  nboot <- length(fit.boot)
+  
+  for( i.boot in 1:nboot ){
+    A.opt <- fit.boot[[i.boot]][[opt.nu]]$A[[opt.lam]]
+    A.opt[abs(A.opt)<1e-15] <- 0
+    B.opt <- fit.boot[[i.boot]][[opt.nu]]$B[[opt.lam]]
+    Chat <- tcrossprod(B.opt, A.opt)
+    
+    Chat2 <- ifelse( abs(Chat)==0, 0, 1 )
+    
+    if( i.boot == 1 ){
+      out <- Chat2
+    } else {
+      out <- out+Chat2
+    }
+  }
+  
+  
+  return( out/100 )
+  # image(out/100, col = gray.colors(10))
+  # heatmap(out/100, Rowv=NA, Colv=NA)
+  
+}
+
+
+
+#' @export iSRRR.SelFreq.C.heatmap
+iSRRR.SelFreq.C.heatmap <- function(SelFreq.Chat){
+  
+  dimnames(SelFreq.Chat) <- NULL
+  SelFreq.Chat.df <- adply( as.matrix(SelFreq.Chat), 1:2 )
+  # heatmap( SelFreq.Chat, Rowv=NA, Colv=NA, col=rev(gray.colors(10)) )
+  colnames(SelFreq.Chat.df) <- c("x", "y", "value")
+  SelFreq.Chat.df$x <- as.numeric(as.character(SelFreq.Chat.df$x))
+  SelFreq.Chat.df$y <- as.numeric(as.character(SelFreq.Chat.df$y))
+  
+  legend.bar.width=20
+  legend.bar.height=0.2
+  plt <- SelFreq.Chat.df %>% 
+    cbind.data.frame(w=2, h=2) |>
+    ggplot(aes(x=y,y=max(x)-x+1,fill=value)) +
+    geom_tile(color=NA, size=0) +
+    # scale_fill_gradient2(low = "white",
+    #                      high = "black") +
+    # scale_fill_gradient2(low = "#AB3027",
+    #                      mid = "white",
+    #                      # mid = "#D2FBC5",
+    #                      # mid = "#FFFFC2",
+    #                      high = "#0F1BBF") +
+    # scale_fill_binned(type="viridis") +
+    # scale_colour_stepsn(colours = terrain.colors(10)) +
+    scale_fill_steps(breaks=c(0:10*0.1),
+                     low = "white",
+                     high = "black") +
+    # scale_fill_continuous_divergingx(palette = 'RdBu', mid = 0) + 
+    scale_x_discrete(expand = c(0,0)) +
+    scale_y_discrete(expand = c(0,0)) +
+    theme_bw(base_size = 10) +
+    theme(legend.position = "bottom",
+          axis.title = element_blank(),
+          axis.ticks = element_blank(), 
+          # panel.border = element_blank(),
+          axis.text = element_blank() ) +
+    guides(fill = guide_colorbar(title = "",
+                                 label.position = "bottom",
+                                 title.position = "left",
+                                 title.vjust = 1,
+                                 frame.colour = "black",
+                                 barwidth = legend.bar.width,
+                                 barheight = legend.bar.height))
+  
+  plt +
+    annotate("text", x = -1.2, y = sum(c(558, 476, 409, 502/2)), label = "Exp", angle=90) +
+    annotate("text", x = -1.2, y = sum(c(558, 476, 409/2)), label = "Mut", angle=90) +
+    annotate("text", x = -1.2, y = sum(c(558, 476/2)), label = "Met", angle=90) +
+    annotate("text", x = -1.2, y = sum(c(558/2)), label = "Cop", angle=90) +
+    # theme(plot.margin = margin(.6,.6,.6,.6, "cm")) +
+    theme(plot.margin = margin(.3,.3,.3,.8, "cm")) +
+    coord_cartesian(xlim=c(0.5,53.5), clip = "off")
+  
+}

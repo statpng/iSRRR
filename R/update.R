@@ -334,7 +334,7 @@ png.varimax <- function(X){
 
 
 
-
+#' @import ManifoldOptim
 UpdateA.ManifoldOptim <- function(X, Y, A=NULL, B, tau, eps=1e-10, Max_Iteration=100){
   # X <- data$X; Y <- data$Y; B <- data$B
   # eps=1e-10; Max_Iteration=100
@@ -356,7 +356,7 @@ UpdateA.ManifoldOptim <- function(X, Y, A=NULL, B, tau, eps=1e-10, Max_Iteration
   # dF <- function(A) { A <- tA(A); As <- 1/sqrt( sum(A^2) + eps); - 1/(n*q) * 2 * t(Y - X %*% B %*% t(A)) %*% (X %*% B) + tau * A * As }
   
   
-  library(ManifoldOptim)
+  
   mod <- Module("ManifoldOptim_module", PACKAGE = "ManifoldOptim")
   prob <- new(mod$RProblem, f, dF)
   

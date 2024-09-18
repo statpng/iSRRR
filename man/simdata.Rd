@@ -2,28 +2,10 @@
 % Please edit documentation in R/simdata.R
 \name{simdata}
 \alias{simdata}
-\alias{simdata2}
+\alias{CorrAR}
 \title{Simulation Data}
 \usage{
-simdata2(
-  typeA = "sparse",
-  typeB = "all",
-  n = 50,
-  p = 10,
-  q = 10,
-  d = 3,
-  rvec = rep(2, 3),
-  nuA = 0.2,
-  nuB = 0.5,
-  d0 = 3,
-  es = "1",
-  es.B = 1,
-  snr = 1,
-  simplify = TRUE,
-  sigma = NULL,
-  rho_X = 0.5,
-  rho_E = 0
-)
+CorrAR(p, rho)
 }
 \arguments{
 \item{typeA}{One of \code{sparse0.1}, \code{sparse0.2}, \code{sparse0.3}, \code{sparse0.4}, \code{stiefel} and \code{perfect-simple}.}
@@ -32,25 +14,25 @@ simdata2(
 
 \item{n}{The number of samples. Default is 50.}
 
+\item{d}{The number of multi-source datasets. Default is 3.}
+
 \item{q}{The number of responses. Default is 10.}
 
-\item{d}{The number of multi-source datasets. Default is 3.}
+\item{pvec}{A vector representing the number of variables for each dataset. Default is \code{rep(10, 3)}.}
 
 \item{rvec}{A vector representing the rank of each dataset. Default is \code{rep(2, 3)}.}
 
 \item{es}{Effect size: choose one of "1", "2", ..., "5" and "norm". Default is "5".}
 
-\item{snr}{A numeric value for SNR (signal to noise). Default is 1.}
-
 \item{simplify}{A logical value for simplifying the matrix of \code{A} using the quartimax rotation. Default is TRUE.}
+
+\item{snr}{A numeric value for SNR (signal to noise). Default is 1.}
 
 \item{sigma}{A numeric value of a multiplying constant on the variance of an error term. Default is NULL. If NULL, sigma = |Y0|_F^2 / |E|_F^2) / sqrt(snr), where Y0 = XBA^T.}
 
 \item{rho_X}{A numeric value for controlling the correlation between predictors.}
 
 \item{rho_E}{A numeric value for controlling the correlation between errors.}
-
-\item{pvec}{A vector representing the number of variables for each dataset. Default is \code{rep(10, 3)}.}
 }
 \value{
 A list with Y, X, C, A, B, sigma, Xsigma, n, d, q, p, rvec, sim.params
@@ -60,8 +42,9 @@ Simulation Data with a sparse structural \code{B} and a sparse \code{A} with ort
 }
 \examples{
 
-
-data <- rrr.sim(typeA="sparse0.4", typeB="all", n=20, d=3, q=10, p=5, rvec=rep(2,3), es="1", simplify=TRUE, snr=1)
+data <- simdata2(typeA="quartimax", typeB="individual", 
+                 n=50, d=4, q=60, p=100, rvec=rep(2,4), 
+                 snr=0.5)
 
 data$B |> round(3)
 data$A |> round(3)

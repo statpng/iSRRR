@@ -1,0 +1,3 @@
+load("/Users/png/Library/Mobile Documents/com~apple~CloudDocs/Packages/iSRRR/data/NCI60-XY.RData")
+ls()
+save(X.list, Y.list, file="iSRRR.data.rda")

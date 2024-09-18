@@ -27,13 +27,36 @@
 #'
 #' @examples
 #'
-#'
-#' data <- rrr.sim(typeA="sparse0.4", typeB="all", n=20, d=3, q=10, p=5, rvec=rep(2,3), es="1", simplify=TRUE, snr=1)
+#' data <- simdata2(typeA="quartimax", typeB="individual", 
+#'                  n=50, d=4, q=60, p=100, rvec=rep(2,4), 
+#'                  snr=0.5)
 #'
 #' data$B |> round(3)
 #' data$A |> round(3)
 #'
 #'
+
+
+
+CorrAR <- function(p, rho){
+  rho^outer(1:p, 1:p, function(x, y) abs(x-y))
+}
+
+CorrCS <- function(p, rho)
+{
+  Sigma <- matrix(nrow = p, ncol = p, rho)
+  diag(Sigma) <- 1
+  Sigma
+}
+
+rustiefel <- function(q, r){
+  X <- matrix(rnorm(q*r), q, r)
+  tmp <- eigen(t(X) %*% X)
+  X %*% (tmp$vec %*% sqrt(diag(1/tmp$val, nrow = R)) %*% t(tmp$vec))
+}
+
+
+
 
 #' @export simdata2
 simdata2 <- function(typeA="sparse",
@@ -89,18 +112,7 @@ simdata2 <- function(typeA="sparse",
     }
   }
 
-  CorrAR <- function(p, rho){
-    rho^outer(1:p, 1:p, function(x, y) abs(x-y))
-  }
-
-  CorrCS <- function(p, rho)
-  {
-    Sigma <- matrix(nrow = p, ncol = p, rho)
-    diag(Sigma) <- 1
-    Sigma
-  }
-
-
+  
 
   Dist <- switch(es,
                  `1` = function(n) runif(n, 0.1, 0.3),
@@ -162,13 +174,8 @@ simdata2 <- function(typeA="sparse",
 
   } else if( typeA == "stiefel" ){
 
-    rustiefel <- function(q, r){
-      X <- matrix(rnorm(q*r), q, r)
-      tmp <- eigen(t(X) %*% X)
-      X %*% (tmp$vec %*% sqrt(diag(1/tmp$val, nrow = R)) %*% t(tmp$vec))
-    }
-
-    A <- rstiefel::rustiefel(q, r)
+    A <- rustiefel(q, r)
+    
   } else if( typeA == "quartimax" ){
     
     A <- ToOrthogonal(q, r, 0, simplify=simplify)
@@ -367,17 +374,6 @@ simdata3 <- function(typeA="sparse",
     }
   }
   
-  CorrAR <- function(p, rho){
-    rho^outer(1:p, 1:p, function(x, y) abs(x-y))
-  }
-  
-  CorrCS <- function(p, rho)
-  {
-    Sigma <- matrix(nrow = p, ncol = p, rho)
-    diag(Sigma) <- 1
-    Sigma
-  }
-  
   
   
   Dist <- switch(es,
@@ -440,13 +436,8 @@ simdata3 <- function(typeA="sparse",
     
   } else if( typeA == "stiefel" ){
     
-    rustiefel <- function(q, r){
-      X <- matrix(rnorm(q*r), q, r)
-      tmp <- eigen(t(X) %*% X)
-      X %*% (tmp$vec %*% sqrt(diag(1/tmp$val, nrow = R)) %*% t(tmp$vec))
-    }
+    A <- rustiefel(q, r)
     
-    A <- rstiefel::rustiefel(q, r)
   } else if( typeA == "quartimax" ){
     
     A <- ToOrthogonal(q, r, 0, simplify=simplify)
@@ -631,24 +622,22 @@ simdata <- function (typeA="sparse",
 
     {
       set.seed(1)
-      data <- simdata(typeA="sparse0.2", typeB="random", n=20, d=5, q=20, pvec=rep(50,5), rvec=rep(1,5), es="2", simplify=TRUE, snr=1)
+      data <- simdata(typeA="sparse0.2", typeB="random", n=20, d=5, q=20, pvec=rep(50,5), rvec=rep(1,5), es="2", simplify=TRUE, snr=2)
 
-      data$sigma
+      
+      library(dplyr)
+      r <- data$rvec %>% sum
+      sum((data$X %*% with(svd(with(data,tcrossprod(B,A))), tcrossprod(u%*%diag(d),v)))^2)/sum(with(data, Y-X%*%B%*%t(A))^2)
+      
+      sum((data$X %*% data$B%*%t(data$A))^2)/sum((data$UU*data$sigma)^2)
+      
+      
     }
   }
 
-  CorrAR <- function(p, rho){
-    rho^outer(1:p, 1:p, function(x, y) abs(x-y))
-  }
-
-  CorrCS <- function(p, rho)
-  {
-    Sigma <- matrix(nrow = p, ncol = p, rho)
-    diag(Sigma) <- 1
-    Sigma
-  }
-
-
+  
+  
+  
 
   Dist <- switch(es,
                  `1` = function(n) runif(n, 0.1, 0.3),
@@ -709,13 +698,7 @@ simdata <- function (typeA="sparse",
 
   } else if( typeA == "stiefel" ){
 
-    rustiefel <- function(q, r){
-      X <- matrix(rnorm(q*r), q, r)
-      tmp <- eigen(t(X) %*% X)
-      X %*% (tmp$vec %*% sqrt(diag(1/tmp$val, nrow = R)) %*% t(tmp$vec))
-    }
-
-    A <- rstiefel::rustiefel(q, r)
+    A <- rustiefel(q, r)
 
   }
 
@@ -854,20 +837,18 @@ simdata <- function (typeA="sparse",
 
 
 
+orthogonalize <- function(X, threshold){
+  fit.svd <- svd(X)
+  orth <- fit.svd$u %*% t(fit.svd$v)
+  X <- ifelse(abs(orth) > threshold, orth, 0)
+}
+
+
 #' @export ToOrthogonal
 ToOrthogonal <- function(q, r, threshold=0.2, simplify=TRUE){
 
   # q <- 10; r <- 6
   L <- matrix(rnorm(q*r), q, r)
-
-
-  orthogonalize <- function(X, threshold){
-    fit.svd <- svd(X)
-    orth <- fit.svd$u %*% t(fit.svd$v)
-    X <- ifelse(abs(orth) > threshold, orth, 0)
-  }
-
-
 
   it <- 0
   while(TRUE){
